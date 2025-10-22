@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Envío Masivo{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-paper-plane"></i> Envío Masivo de WhatsApp</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cog"></i> Configurar Envío</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="zona_id" class="form-label">Seleccionar Zona:</label>
+                            <select name="zona_id" id="zona_id" class="form-select" required onchange="cargarDestinatarios()">
+                                <option value="">Seleccione una zona</option>
+                                {% for zona in zonas %}
+                                <option value="{{ zona.id }}">{{ zona.nombre }} ({{ zona.clientes|length }} clientes)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="plantilla_id" class="form-label">Seleccionar Mensaje:</label>
+                            <select name="plantilla_id" id="plantilla_id" class="form-select" required onchange="mostrarVistaPrevia()">
+                                <option value="">Seleccione un mensaje</option>
+                                {% for plantilla in plantillas %}
+                                <option value="{{ plantilla.id }}" data-contenido="{{ plantilla.contenido }}">{{ plantilla.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Sección de Destinatarios -->
+                    <div id="destinatarios-section" class="row" style="display: none;">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5><i class="fas fa-users"></i> Destinatarios</h5>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="seleccionarTodos()">
+                                            <i class="fas fa-check-square"></i> Seleccionar Todos
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deseleccionarTodos()">
+                                            <i class="fas fa-square"></i> Deseleccionar Todos
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row" id="lista-destinatarios">
+                                        <!-- Los destinatarios se cargarán aquí dinámicamente -->
+                                    </div>
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <span id="contador-seleccionados">0</span> destinatarios seleccionados de <span id="total-destinatarios">0</span>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista Previa del Mensaje -->
+                    <div id="vista-previa-section" class="row" style="display: none;">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-eye"></i> Vista Previa del Mensaje</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="vista-previa-contenido" class="border p-3 rounded bg-light">
+                                        <!-- El contenido del mensaje se mostrará aquí -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Advertencia:</strong> Esta acción enviará mensajes solo a los destinatarios seleccionados de la zona elegida. 
+                                Revisa la lista de destinatarios antes de continuar.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos ocultos para enviar los datos -->
+                    <input type="hidden" name="destinatarios_seleccionados" id="destinatarios_seleccionados">
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary me-md-2" onclick="window.history.back()">
+                                    <i class="fas fa-arrow-left"></i> Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-success" id="btn-enviar" disabled>
+                                    <i class="fas fa-paper-plane"></i> Enviar Mensajes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-map"></i> Zonas Disponibles</h5>
+            </div>
+            <div class="card-body">
+                {% if zonas %}
+                    <ul class="list-group list-group-flush">
+                        {% for zona in zonas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ zona.nombre }}
+                            <span class="badge bg-primary rounded-pill">{{ zona.clientes|length }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">No hay zonas configuradas.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-comment"></i> Plantillas Disponibles</h5>
+            </div>
+            <div class="card-body">
+                {% if plantillas %}
+                    <ul class="list-group list-group-flush">
+                        {% for plantilla in plantillas %}
+                        <li class="list-group-item">
+                            <strong>{{ plantilla.nombre }}</strong>
+                            <br>
+                            <small class="text-muted">{{ plantilla.contenido[:50] }}...</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">No hay plantillas configuradas.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let destinatarios = [];
+
+function cargarDestinatarios() {
+    const zonaId = document.getElementById('zona_id').value;
+    if (!zonaId) {
+        document.getElementById('destinatarios-section').style.display = 'none';
+        return;
+    }
+    
+    // Mostrar loading
+    document.getElementById('lista-destinatarios').innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Cargando destinatarios...</div>';
+    document.getElementById('destinatarios-section').style.display = 'block';
+    
+    // Cargar destinatarios desde la API
+    fetch(`/api/clientes_zona/${zonaId}`)
+        .then(response => response.json())
+        .then(data => {
+            destinatarios = data;
+            mostrarDestinatarios();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('lista-destinatarios').innerHTML = '<div class="col-12 text-center text-danger">Error al cargar destinatarios</div>';
+        });
+}
+
+function mostrarDestinatarios() {
+    const container = document.getElementById('lista-destinatarios');
+    const totalDestinatarios = destinatarios.length;
+    
+    document.getElementById('total-destinatarios').textContent = totalDestinatarios;
+    
+    if (totalDestinatarios === 0) {
+        container.innerHTML = '<div class="col-12 text-center text-muted">No hay destinatarios disponibles en esta zona</div>';
+        return;
+    }
+    
+    let html = '';
+    destinatarios.forEach((cliente, index) => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cliente_${cliente.id}" 
+                                   value="${cliente.id}" checked onchange="actualizarContador()">
+                            <label class="form-check-label" for="cliente_${cliente.id}">
+                                <strong>${cliente.nombre}</strong><br>
+                                <small class="text-muted">${cliente.telefono}</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    actualizarContador();
+}
+
+function actualizarContador() {
+    const checkboxes = document.querySelectorAll('#lista-destinatarios input[type="checkbox"]');
+    const seleccionados = Array.from(checkboxes).filter(cb => cb.checked).length;
+    
+    document.getElementById('contador-seleccionados').textContent = seleccionados;
+    
+    // Habilitar/deshabilitar botón de envío
+    const btnEnviar = document.getElementById('btn-enviar');
+    btnEnviar.disabled = seleccionados === 0;
+    
+    // Actualizar campo oculto
+    const seleccionadosIds = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    document.getElementById('destinatarios_seleccionados').value = seleccionadosIds.join(',');
+}
+
+function seleccionarTodos() {
+    const checkboxes = document.querySelectorAll('#lista-destinatarios input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+    actualizarContador();
+}
+
+function deseleccionarTodos() {
+    const checkboxes = document.querySelectorAll('#lista-destinatarios input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    actualizarContador();
+}
+
+function mostrarVistaPrevia() {
+    const plantillaSelect = document.getElementById('plantilla_id');
+    const contenido = plantillaSelect.options[plantillaSelect.selectedIndex].getAttribute('data-contenido');
+    
+    if (contenido) {
+        document.getElementById('vista-previa-contenido').innerHTML = contenido.replace(/\n/g, '<br>');
+        document.getElementById('vista-previa-section').style.display = 'block';
+    } else {
+        document.getElementById('vista-previa-section').style.display = 'none';
+    }
+}
+</script>
+
+{% endblock %}

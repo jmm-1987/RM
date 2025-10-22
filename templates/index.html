@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recambios RM - Distribución de Recambios</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #000000;
+            color: white;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%),
+                linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(20, 20, 20, 0.8) 100%);
+            z-index: -1;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(45deg, transparent 25%, rgba(255, 255, 255, 0.02) 25%, rgba(255, 255, 255, 0.02) 50%, transparent 50%, transparent 75%, rgba(255, 255, 255, 0.02) 75%);
+            background-size: 60px 60px;
+            z-index: -1;
+            animation: geometricMove 20s linear infinite;
+        }
+        
+        @keyframes geometricMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(60px, 60px); }
+        }
+        
+        .floating-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .shape {
+            position: absolute;
+            opacity: 0.1;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .shape:nth-child(1) {
+            top: 20%;
+            left: 10%;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-radius: 20px;
+            animation-delay: 0s;
+        }
+        
+        .shape:nth-child(2) {
+            top: 60%;
+            right: 15%;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #a8e6cf, #ffd3a5);
+            border-radius: 50%;
+            animation-delay: 2s;
+        }
+        
+        .shape:nth-child(3) {
+            bottom: 30%;
+            left: 20%;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(45deg, #ff9a9e, #fecfef);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            animation-delay: 4s;
+        }
+        
+        .shape:nth-child(4) {
+            top: 40%;
+            right: 30%;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            transform: rotate(45deg);
+            animation-delay: 1s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        .hero-section {
+            background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url('{{ url_for("static", filename="fondo.png") }}');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: white;
+            padding: 0;
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .oferta-card {
+            transition: transform 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .oferta-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .precio {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .destacada {
+            border: 3px solid #ffc107;
+            position: relative;
+        }
+        .destacada::before {
+            content: "⭐ DESTACADA";
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffc107;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .navbar-brand img {
+            transition: transform 0.3s ease;
+        }
+        .navbar-brand:hover img {
+            transform: scale(1.05);
+        }
+        .hero-logo {
+            filter: drop-shadow(0 8px 16px rgba(255,255,255,0.3));
+            transition: transform 0.3s ease, filter 0.3s ease, opacity 0.8s ease;
+            animation: logoEntrance 2s ease-out forwards;
+            opacity: 0;
+            transform: translateY(50px) scale(0.8);
+        }
+        .hero-logo:hover {
+            transform: scale(1.1);
+            filter: drop-shadow(0 12px 24px rgba(255,255,255,0.5));
+        }
+        .oferta-card .card-img-top {
+            aspect-ratio: 1;
+            object-fit: contain;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .section-dark {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .card-body {
+            color: white;
+        }
+        
+        .text-muted {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        @keyframes logoEntrance {
+            0% {
+                opacity: 0;
+                transform: translateY(50px) scale(0.8) rotate(-10deg);
+            }
+            50% {
+                opacity: 0.8;
+                transform: translateY(-10px) scale(1.05) rotate(5deg);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1) rotate(0deg);
+            }
+        }
+        
+        .hero-content {
+            text-align: center;
+            animation: contentFadeIn 2.5s ease-out forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        
+        .hero-content h1 {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            animation: titleGlow 3s ease-in-out infinite alternate;
+        }
+        
+        @keyframes titleGlow {
+            from {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5), 0 0 10px rgba(255, 255, 255, 0.3);
+            }
+            to {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 255, 255, 0.6);
+            }
+        }
+        
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+            pointer-events: none;
+        }
+        
+        @keyframes contentFadeIn {
+            0% {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Estilos para el slider de marcas */
+        .brands-slider {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .brands-container {
+            display: flex;
+            animation: scroll 30s linear infinite;
+            width: calc(200px * 12); /* Ancho total basado en número de logos */
+        }
+        
+        .brand-logo {
+            flex: 0 0 200px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .brand-logo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .brand-logo img {
+            max-height: 60px;
+            max-width: 150px;
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+        
+        .brand-logo:hover img {
+            opacity: 1;
+        }
+        
+        @keyframes scroll {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(calc(-200px * 6)); /* Mueve la mitad para crear loop infinito */
+            }
+        }
+        
+        .brands-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .brands-title h3 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .brands-title p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Elementos geométricos flotantes -->
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='logo_rm.png') }}" alt="Recambios RM" style="height: 40px; margin-right: 10px;">
+               
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Inicio
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('ofertas_publicas') }}">
+                            <i class="fas fa-tags"></i> Ofertas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#trabaja-con-nosotros">
+                            <i class="fas fa-users"></i> Trabaja con Nosotros
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('panel') }}">
+                            <i class="fas fa-cog"></i> Panel Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="row justify-content-center align-items-center min-vh-100">
+                <div class="col-12 hero-content">
+                    <img src="{{ url_for('static', filename='logo_rm.png') }}" alt="Recambios RM" class="img-fluid hero-logo" style="max-height: 200px;">
+                    <div class="mt-4">
+                        <h1 class="display-4 fw-bold mb-3">Recambios RM</h1>
+                        <p class="lead fs-4">Tu distribuidor de confianza para recambios de automoción</p>
+                        <div class="mt-4">
+                            <a href="{{ url_for('ofertas_publicas') }}" class="btn btn-primary btn-lg me-3">
+                                <i class="fas fa-tags"></i> Ver Ofertas
+                            </a>
+                            <a href="#trabaja-con-nosotros" class="btn btn-outline-light btn-lg">
+                                <i class="fas fa-users"></i> Trabaja con Nosotros
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ofertas Destacadas -->
+    {% if ofertas_destacadas %}
+    <section class="py-5 section-dark">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-center mb-5">
+                        <i class="fas fa-star text-warning"></i> Ofertas Destacadas
+                    </h2>
+                </div>
+            </div>
+            <div class="row">
+                {% for oferta in ofertas_destacadas %}
+                <div class="col-md-4 mb-4">
+                    <div class="card oferta-card destacada h-100">
+                        {% if oferta.imagen %}
+                        <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="card-img-top" style="height: 250px; width: 100%; object-fit: contain; background-color: #f8f9fa;" alt="{{ oferta.titulo }}">
+                        {% else %}
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 250px; width: 100%;">
+                            <i class="fas fa-image fa-4x text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ oferta.titulo }}</h5>
+                            <p class="card-text">{{ oferta.descripcion[:120] }}{% if oferta.descripcion|length > 120 %}...{% endif %}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="precio">€{{ "%.2f"|format(oferta.precio) }}</span>
+                                <small class="text-muted">{{ oferta.created_at.strftime('%d/%m/%Y') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Ofertas Normales -->
+    {% if ofertas_normales %}
+    <section class="py-5 section-dark">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-center mb-5">
+                        <i class="fas fa-tags"></i> Más Ofertas
+                    </h2>
+                </div>
+            </div>
+            <div class="row">
+                {% for oferta in ofertas_normales %}
+                <div class="col-md-4 col-lg-3 mb-4">
+                    <div class="card oferta-card h-100">
+                        {% if oferta.imagen %}
+                        <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="card-img-top" style="height: 200px; width: 100%; object-fit: contain; background-color: #f8f9fa;" alt="{{ oferta.titulo }}">
+                        {% else %}
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px; width: 100%;">
+                            <i class="fas fa-image fa-3x text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h6 class="card-title">{{ oferta.titulo }}</h6>
+                            <p class="card-text">{{ oferta.descripcion[:80] }}{% if oferta.descripcion|length > 80 %}...{% endif %}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="precio">€{{ "%.2f"|format(oferta.precio) }}</span>
+                                <small class="text-muted">{{ oferta.created_at.strftime('%d/%m') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="row">
+                <div class="col-12 text-center">
+                    <a href="{{ url_for('ofertas_publicas') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-eye"></i> Ver Todas las Ofertas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Información de la Empresa -->
+    <section class="py-5 section-dark">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-shipping-fast fa-3x mb-3 text-primary"></i>
+                        <h4>Distribución Rápida</h4>
+                        <p>Entregamos en toda la zona metropolitana con nuestro servicio de distribución eficiente.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-medal fa-3x mb-3 text-warning"></i>
+                        <h4>Calidad Garantizada</h4>
+                        <p>Trabajamos solo con marcas reconocidas y ofrecemos garantía en todos nuestros productos.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-headset fa-3x mb-3 text-success"></i>
+                        <h4>Atención Personalizada</h4>
+                        <p>Nuestro equipo está siempre disponible para asesorarte y resolver tus dudas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Slider de Marcas -->
+    <section class="brands-slider">
+        <div class="container">
+            <div class="brands-title">
+                <h3><i class="fas fa-star text-warning"></i> Marcas con las que Trabajamos</h3>
+                <p>Distribuimos recambios de las mejores marcas del mercado automotriz</p>
+            </div>
+            <div class="brands-container">
+                <!-- Primera fila de logos -->
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwN0JGRiIvPgo8Y2lyY2xlIGN4PSIxMDAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNGRjAwMDAiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkJPU0NIPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Bosch">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TUFOTjwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Mann">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1BR05FVEk8L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Magnet">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNBTElDPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Salic">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZBTEVPPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Valeo">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklMVE88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Filtro">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Qk1XPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="BMW">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1FUkNFREVTPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Mercedes">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QVVESS88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Audi">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZPTEtTV0FHRU48L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Volkswagen">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklBVDwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Fiat">
+                </div>
+                <!-- Segunda fila de logos (duplicados para el efecto infinito) -->
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwN0JGRiIvPgo8Y2lyY2xlIGN4PSIxMDAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNGRjAwMDAiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkJPU0NIPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Bosch">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TUFOTjwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Mann">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1BR05FVEk8L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Magnet">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNBTElDPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Salic">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZBTEVPPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Valeo">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklMVE88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Filtro">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Qk1XPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="BMW">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1FUkNFREVTPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Mercedes">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QVVESS88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Audi">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZPTEtTV0FHRU48L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Volkswagen">
+                </div>
+                <div class="brand-logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklBVDwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Fiat">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trabaja con Nosotros -->
+    <section id="trabaja-con-nosotros" class="py-5 section-dark">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-center mb-5">
+                        <i class="fas fa-users text-primary"></i> Trabaja con Nosotros
+                    </h2>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-8 mx-auto">
+                    <div class="card shadow">
+                        <div class="card-body p-5">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-handshake fa-4x text-primary mb-3"></i>
+                                <h3 class="card-title">Únete a Nuestro Equipo</h3>
+                            </div>
+                            <p class="lead text-center mb-4">
+                                En Recambios RM buscamos profesionales comprometidos y con ganas de crecer junto a nosotros.
+                            </p>
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fas fa-truck fa-2x text-success me-3 mt-1"></i>
+                                        <div>
+                                            <h5>Conductores de Reparto</h5>
+                                            <p class="text-muted">Distribución por zonas metropolitanas. Carnet de conducir B, experiencia valorada.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fas fa-warehouse fa-2x text-info me-3 mt-1"></i>
+                                        <div>
+                                            <h5>Personal de Almacén</h5>
+                                            <p class="text-muted">Gestión de inventario, preparación de pedidos y control de stock.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fas fa-headset fa-2x text-warning me-3 mt-1"></i>
+                                        <div>
+                                            <h5>Atención al Cliente</h5>
+                                            <p class="text-muted">Atención telefónica y gestión de consultas comerciales.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fas fa-cogs fa-2x text-danger me-3 mt-1"></i>
+                                        <div>
+                                            <h5>Técnicos Especializados</h5>
+                                            <p class="text-muted">Conocimiento en recambios de automoción y experiencia técnica.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-primary text-white p-4 rounded mb-4">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-star"></i> ¿Qué Ofrecemos?
+                                </h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-check me-2"></i> Contrato estable</li>
+                                            <li><i class="fas fa-check me-2"></i> Horario flexible</li>
+                                            <li><i class="fas fa-check me-2"></i> Formación continua</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-check me-2"></i> Ambiente de trabajo agradable</li>
+                                            <li><i class="fas fa-check me-2"></i> Posibilidades de crecimiento</li>
+                                            <li><i class="fas fa-check me-2"></i> Salario competitivo</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <h5 class="mb-3">¿Interesado?</h5>
+                                <p class="text-muted mb-4">
+                                    Envía tu CV y carta de presentación a nuestro equipo de recursos humanos.
+                                </p>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <a href="mailto:rrhh@recambiosrm.com" class="btn btn-primary btn-lg w-100">
+                                            <i class="fas fa-envelope"></i> Enviar CV
+                                        </a>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <a href="tel:+34900123456" class="btn btn-outline-primary btn-lg w-100">
+                                            <i class="fas fa-phone"></i> Llamar Ahora
+                                        </a>
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    También puedes visitarnos en nuestras instalaciones para más información.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contacto -->
+    <section id="contacto" class="py-5 section-dark">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-center mb-5">
+                        <i class="fas fa-phone"></i> Contacto
+                    </h2>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-map-marker-alt text-primary"></i> Información de Contacto
+                            </h5>
+                            <p class="card-text">
+                                <strong>Recambios RM</strong><br>
+                                Distribución de Recambios<br>
+                                Madrid, España<br><br>
+                                <i class="fas fa-phone"></i> +34 900 123 456<br>
+                                <i class="fas fa-envelope"></i> info@recambiosrm.com<br>
+                                <i class="fas fa-clock"></i> Lunes a Viernes: 8:00 - 18:00
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-truck text-success"></i> Zonas de Reparto
+                            </h5>
+                            <p class="card-text">
+                                Realizamos entregas en las siguientes zonas:<br>
+                                • Zona1 - Centro<br>
+                                • Zona2 - Norte<br>
+                                • Zona3 - Sur<br>
+                                • Zona4 - Este<br>
+                                • Zona5 - Oeste<br>
+                                • Zona6 - Polígono Industrial<br>
+                                • Zona7 - Residencial<br>
+                                • Zona8 - Carretera Nacional
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="section-dark py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Recambios RM</h5>
+                    <p>Tu distribuidor de confianza para recambios de automoción.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>&copy; 2025 Recambios RM. Todos los derechos reservados.</p>
+                    <a href="{{ url_for('panel') }}" class="text-light">
+                        <i class="fas fa-cog"></i> Panel Administrativo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

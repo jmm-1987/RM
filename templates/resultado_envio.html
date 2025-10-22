@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado del Envío{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-check-circle"></i> Resultado del Envío</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-map-marker-alt fa-2x text-primary mb-2"></i>
+                <h5>Zona</h5>
+                <p class="card-text">{{ zona.nombre }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-comment fa-2x text-info mb-2"></i>
+                <h5>Plantilla</h5>
+                <p class="card-text">{{ plantilla.nombre }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-chart-pie fa-2x text-success mb-2"></i>
+                <h5>Total Enviados</h5>
+                <p class="card-text">{{ exitosos + fallidos }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h4 class="text-success">{{ exitosos }}</h4>
+                <p class="card-text">Mensajes Enviados Exitosamente</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <i class="fas fa-times-circle fa-3x text-danger mb-3"></i>
+                <h4 class="text-danger">{{ fallidos }}</h4>
+                <p class="card-text">Mensajes Fallidos</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Detalle de Resultados</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Teléfono</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resultado in resultados %}
+                            <tr>
+                                <td>{{ resultado.cliente }}</td>
+                                <td>{{ resultado.telefono }}</td>
+                                <td>
+                                    {% if resultado.exito %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Enviado
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> Error
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12 text-center">
+        <a href="{{ url_for('enviar_masivo') }}" class="btn btn-whatsapp btn-lg">
+            <i class="fab fa-whatsapp"></i> Nuevo Envío
+        </a>
+        <a href="{{ url_for('historial') }}" class="btn btn-info btn-lg ms-2">
+            <i class="fas fa-history"></i> Ver Historial
+        </a>
+        <a href="{{ url_for('panel') }}" class="btn btn-secondary btn-lg ms-2">
+            <i class="fas fa-home"></i> Inicio
+        </a>
+    </div>
+</div>
+{% endblock %}
+

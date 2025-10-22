@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Ofertas{% endblock %}
+
+{% block extra_head %}
+<style>
+    .oferta-card .card-img-top {
+        aspect-ratio: 1;
+        object-fit: contain;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-tags"></i> Gestión de Ofertas</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <a href="{{ url_for('nueva_oferta') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nueva Oferta
+        </a>
+        <a href="{{ url_for('index') }}" target="_blank" class="btn btn-info">
+            <i class="fas fa-globe"></i> Ver Web Pública
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Lista de Ofertas</h5>
+            </div>
+            <div class="card-body">
+                {% if ofertas %}
+                    <div class="row">
+                        {% for oferta in ofertas %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100">
+                                {% if oferta.imagen %}
+                                <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="card-img-top" style="height: 200px; width: 100%; object-fit: contain; background-color: #f8f9fa;" alt="{{ oferta.titulo }}">
+                                {% else %}
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px; width: 100%;">
+                                    <i class="fas fa-image fa-3x text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ oferta.titulo }}</h6>
+                                    <p class="card-text">{{ oferta.descripcion[:100] }}{% if oferta.descripcion|length > 100 %}...{% endif %}</p>
+                                    <h5 class="text-success">€{{ "%.2f"|format(oferta.precio) }}</h5>
+                                    <div class="mb-2">
+                                        {% if oferta.destacada %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-star"></i> Destacada
+                                            </span>
+                                        {% endif %}
+                                        {% if oferta.activa %}
+                                            <span class="badge bg-success">Activa</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactiva</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">
+                                        Creada: {{ oferta.created_at.strftime('%d/%m/%Y') }}
+                                    </small>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group w-100" role="group">
+                                        <a href="{{ url_for('editar_oferta', id=oferta.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('toggle_oferta', id=oferta.id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if oferta.activa else 'success' }}">
+                                                <i class="fas fa-{{ 'eye-slash' if oferta.activa else 'eye' }}"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('eliminar_oferta', id=oferta.id) }}" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar esta oferta?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay ofertas creadas aún.</p>
+                        <a href="{{ url_for('nueva_oferta') }}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Crear Primera Oferta
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

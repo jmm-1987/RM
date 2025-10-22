@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Configurar Green-API{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-edit"></i> Configurar Green-API</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fab fa-whatsapp text-success"></i> Datos de Configuración</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="api_url" class="form-label">URL de la API:</label>
+                        <input type="url" class="form-control" id="api_url" name="api_url" 
+                               placeholder="https://7107.api.green-api.com" required>
+                        <div class="form-text">URL completa de tu instancia de Green-API</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="api_token" class="form-label">Token de Autenticación:</label>
+                        <input type="password" class="form-control" id="api_token" name="api_token" 
+                               placeholder="Tu token de Green-API" required>
+                        <div class="form-text">Token de autenticación de tu instancia</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Información:</strong> Estos datos se pueden encontrar en tu panel de Green-API en la sección "Instances".
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('configuracion') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Configuración
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-question-circle"></i> ¿Dónde encontrar estos datos?</h5>
+            </div>
+            <div class="card-body">
+                <h6>1. Accede a tu panel de Green-API</h6>
+                <p class="small">Ve a <a href="https://console.green-api.com" target="_blank">console.green-api.com</a></p>
+                
+                <h6>2. Selecciona tu instancia</h6>
+                <p class="small">En la lista de instancias, haz clic en la que quieres usar</p>
+                
+                <h6>3. Copia los datos</h6>
+                <ul class="small">
+                    <li><strong>apiUrl:</strong> La URL que aparece en la configuración</li>
+                    <li><strong>apiTokenInstance:</strong> El token (haz clic en el ojo para verlo)</li>
+                </ul>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Importante:</strong> Asegúrate de que tu instancia esté en estado "Authorized" antes de configurar.
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-lightbulb"></i> Consejos</h5>
+            </div>
+            <div class="card-body">
+                <ul class="small">
+                    <li>La URL debe empezar con "https://"</li>
+                    <li>El token es sensible, no lo compartas</li>
+                    <li>Verifica que la instancia esté autorizada</li>
+                    <li>Después de configurar, haz una prueba</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

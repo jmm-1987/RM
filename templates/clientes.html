@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-users"></i> Gestión de Clientes</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Filtrar por Zona</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET">
+                    <div class="mb-3">
+                        <label for="zona_id" class="form-label">Seleccionar Zona:</label>
+                        <select name="zona_id" id="zona_id" class="form-select" onchange="this.form.submit()">
+                            <option value="">Todas las zonas</option>
+                            {% for zona in zonas %}
+                            <option value="{{ zona.id }}" {% if zona.id == zona_seleccionada %}selected{% endif %}>
+                                {{ zona.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>Total de Clientes</h5>
+                <h2 class="text-primary">{{ clientes|length }}</h2>
+                {% if zona_seleccionada %}
+                    {% for zona in zonas %}
+                        {% if zona.id == zona_seleccionada %}
+                            <p class="text-muted">Zona: {{ zona.nombre }}</p>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Lista de Clientes</h5>
+            </div>
+            <div class="card-body">
+                {% if clientes %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th>Dirección</th>
+                                    <th>Población</th>
+                                    <th>Zona</th>
+                                    <th>Incluir</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cliente in clientes %}
+                                <tr>
+                                    <td>{{ cliente.nombre }}</td>
+                                    <td>
+                                        <a href="https://wa.me/{{ cliente.telefono }}" target="_blank" class="btn btn-sm btn-whatsapp">
+                                            <i class="fab fa-whatsapp"></i> {{ cliente.telefono }}
+                                        </a>
+                                    </td>
+                                    <td>{{ cliente.email or 'No especificado' }}</td>
+                                    <td>{{ cliente.direccion or 'No especificada' }}</td>
+                                    <td>{{ cliente.poblacion or 'No especificada' }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ cliente.zona.nombre }}</span>
+                                    </td>
+                                    <td>
+                                        {% if cliente.incluir %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> Sí
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times"></i> No
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cliente.activo %}
+                                            <span class="badge bg-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactivo</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay clientes en esta zona o no hay clientes registrados.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Mensajes{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-comment"></i> Plantillas de Mensajes</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Plantillas Disponibles</h5>
+            </div>
+            <div class="card-body">
+                {% if plantillas %}
+                    {% for plantilla in plantillas %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ plantilla.nombre }}</h6>
+                            <p class="card-text">{{ plantilla.contenido }}</p>
+                            <small class="text-muted">
+                                Variables disponibles: {nombre_cliente}, {zona}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-comment fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay plantillas de mensajes configuradas.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Información sobre Variables</h5>
+            </div>
+            <div class="card-body">
+                <p>Las plantillas de mensajes pueden incluir las siguientes variables que se reemplazarán automáticamente:</p>
+                <ul>
+                    <li><code>{nombre_cliente}</code> - Se reemplaza con el nombre del cliente</li>
+                    <li><code>{zona}</code> - Se reemplaza con el nombre de la zona</li>
+                </ul>
+                <p class="text-muted">Ejemplo: "Hola {nombre_cliente}, vamos a pasar por la zona {zona}..."</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

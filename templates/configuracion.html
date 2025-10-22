@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-cog"></i> Configuración del Sistema</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fab fa-whatsapp text-success"></i> Estado de Green-API</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Estado de Conexión:</h6>
+                        {% if conectado %}
+                            <span class="badge bg-success fs-6">
+                                <i class="fas fa-check-circle"></i> Conectado
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger fs-6">
+                                <i class="fas fa-times-circle"></i> Desconectado
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Mensaje:</h6>
+                        <p class="text-muted">{{ mensaje }}</p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <!-- Información de la API -->
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="fas fa-info-circle"></i> Información de la Instancia:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><strong>URL de la API:</strong></td>
+                                        <td><code>{{ config.url }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>ID de Instancia:</strong></td>
+                                        <td><code>{{ config.instance_id }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Número de Teléfono:</strong></td>
+                                        <td><code>{{ config.phone }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Token:</strong></td>
+                                        <td>
+                                            <code>{{ config.token }}</code>
+                                            {% if config.token != 'No configurado' %}
+                                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copiarToken()">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                    <a href="{{ url_for('configurar_green_api_route') }}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> Configurar Green-API
+                    </a>
+                    <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#testModal">
+                        <i class="fas fa-paper-plane"></i> Enviar Prueba
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="verificarEstado()">
+                        <i class="fas fa-sync"></i> Verificar Estado
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Información sobre Green-API</h5>
+            </div>
+            <div class="card-body">
+                <h6>¿Qué es Green-API?</h6>
+                <p>Green-API es un servicio que permite enviar mensajes de WhatsApp de forma automatizada a través de su API REST.</p>
+                
+                <h6>Configuración necesaria:</h6>
+                <ul>
+                    <li><strong>API URL:</strong> La URL de tu instancia (ej: https://7107.api.green-api.com)</li>
+                    <li><strong>API Token:</strong> El token de autenticación de tu instancia</li>
+                </ul>
+                
+                <h6>Pasos para configurar:</h6>
+                <ol>
+                    <li>Accede a tu panel de Green-API</li>
+                    <li>Copia la URL de tu instancia</li>
+                    <li>Copia el token de autenticación</li>
+                    <li>Configura estos datos en el sistema</li>
+                    <li>Realiza una prueba de envío</li>
+                </ol>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Importante:</strong> Asegúrate de que tu instancia de Green-API esté autorizada y funcionando correctamente.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Estadísticas</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>Mensajes Enviados (Hoy)</h6>
+                    <span class="badge bg-primary fs-6">0</span>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Mensajes Enviados (Total)</h6>
+                    <span class="badge bg-info fs-6">0</span>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Clientes Activos</h6>
+                    <span class="badge bg-success fs-6">{{ clientes_activos or 0 }}</span>
+                </div>
+                
+                <hr>
+                
+                <h6>Última Actividad:</h6>
+                <p class="text-muted small">
+                    {% if conectado %}
+                        Sistema conectado y listo para enviar mensajes
+                    {% else %}
+                        Sistema en modo simulación
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-question-circle"></i> Ayuda</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">Si tienes problemas con la configuración:</p>
+                <ul class="small">
+                    <li>Verifica que la URL sea correcta</li>
+                    <li>Confirma que el token sea válido</li>
+                    <li>Revisa que la instancia esté autorizada</li>
+                    <li>Prueba con un número de teléfono válido</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para prueba de envío -->
+<div class="modal fade" id="testModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-paper-plane"></i> Enviar Mensaje de Prueba
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('test_green_api') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="numero_test" class="form-label">Número de Teléfono:</label>
+                        <input type="text" class="form-control" id="numero_test" name="numero_test" 
+                               placeholder="Ej: 612345678" required>
+                        <div class="form-text">Incluye el código de país si es necesario (ej: 34612345678)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="mensaje_test" class="form-label">Mensaje de Prueba:</label>
+                        <textarea class="form-control" id="mensaje_test" name="mensaje_test" rows="3">
+¡Hola! Este es un mensaje de prueba desde Recambios RM. Si recibes este mensaje, la configuración de Green-API está funcionando correctamente.
+
+Recambios RM - Tu distribuidor de confianza
+                        </textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Enviar Prueba
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarToken() {
+    const token = '{{ config.token }}';
+    if (token === 'No configurado') {
+        alert('No hay token configurado');
+        return;
+    }
+    
+    navigator.clipboard.writeText(token).then(function() {
+        // Mostrar notificación de éxito
+        const btn = event.target.closest('button');
+        const originalIcon = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalIcon;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-secondary');
+        }, 2000);
+    }).catch(function(err) {
+        alert('Error al copiar el token: ' + err);
+    });
+}
+
+function verificarEstado() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+    btn.disabled = true;
+    
+    // Simular verificación (en una implementación real, harías una llamada AJAX)
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        
+        // Recargar la página para mostrar el estado actualizado
+        window.location.reload();
+    }, 2000);
+}
+</script>
+
+{% endblock %}

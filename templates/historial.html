@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Historial{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-history"></i> Historial de Envíos</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Últimos Envíos</h5>
+            </div>
+            <div class="card-body">
+                {% if mensajes %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Población</th>
+                                    <th>Teléfono</th>
+                                    <th>Plantilla</th>
+                                    <th>Estado</th>
+                                    <th>Error</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mensaje in mensajes %}
+                                <tr>
+                                    <td>{{ mensaje.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>{{ mensaje.cliente.nombre }}</td>
+                                    <td>{{ mensaje.cliente.poblacion or 'No especificada' }}</td>
+                                    <td>{{ mensaje.cliente.telefono }}</td>
+                                    <td>{{ mensaje.plantilla.nombre }}</td>
+                                    <td>
+                                        {% if mensaje.enviado %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> Enviado
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times"></i> Error
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if mensaje.error %}
+                                            <small class="text-danger">{{ mensaje.error }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay historial de envíos disponible.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

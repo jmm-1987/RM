@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Oferta{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-edit"></i> Editar Oferta</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-edit"></i> Información de la Oferta</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="titulo" class="form-label">Título de la Oferta:</label>
+                        <input type="text" class="form-control" id="titulo" name="titulo" value="{{ oferta.titulo }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción:</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="4" required>{{ oferta.descripcion }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="precio" class="form-label">Precio (€):</label>
+                        <input type="number" step="0.01" class="form-control" id="precio" name="precio" value="{{ oferta.precio }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="imagen" class="form-label">Imagen:</label>
+                        {% if oferta.imagen %}
+                        <div class="mb-2">
+                            <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="img-thumbnail" style="max-width: 200px;" alt="Imagen actual">
+                            <p class="text-muted small">Imagen actual</p>
+                        </div>
+                        {% endif %}
+                        <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
+                        <div class="form-text">Deja vacío para mantener la imagen actual. Formatos: JPG, PNG, GIF. Máx: 16MB</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="destacada" name="destacada" {% if oferta.destacada %}checked{% endif %}>
+                            <label class="form-check-label" for="destacada">
+                                <i class="fas fa-star"></i> Marcar como oferta destacada
+                            </label>
+                        </div>
+                        <div class="form-text">Las ofertas destacadas aparecen en la portada de la web pública</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('ofertas') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Actualizar Oferta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Información</h5>
+            </div>
+            <div class="card-body">
+                <h6>Detalles de la oferta:</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Creada:</strong> {{ oferta.created_at.strftime('%d/%m/%Y %H:%M') }}</li>
+                    <li><strong>Última actualización:</strong> {{ oferta.updated_at.strftime('%d/%m/%Y %H:%M') }}</li>
+                    <li><strong>Estado:</strong> 
+                        {% if oferta.activa %}
+                            <span class="badge bg-success">Activa</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactiva</span>
+                        {% endif %}
+                    </li>
+                </ul>
+                
+                <hr>
+                
+                <h6>Vista previa:</h6>
+                <p class="text-muted">Los cambios se reflejarán inmediatamente en la web pública.</p>
+                
+                <a href="{{ url_for('index') }}" target="_blank" class="btn btn-outline-info btn-sm">
+                    <i class="fas fa-globe"></i> Ver Web Pública
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
