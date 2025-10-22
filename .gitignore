@@ -37,11 +37,11 @@ venv.bak/
 # green_api_config.py
 
 # Archivos de uploads (opcional, comentar si quieres mantener las imágenes)
-static/uploads/*.png
-static/uploads/*.jpg
-static/uploads/*.jpeg
-static/uploads/*.gif
-static/uploads/*.webp
+#static/uploads/*.png
+#static/uploads/*.jpg
+#static/uploads/*.jpeg
+#static/uploads/*.gif
+#static/uploads/*.webp
 
 # Archivos del sistema
 .DS_Store
