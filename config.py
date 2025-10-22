@@ -18,3 +18,6 @@ GREEN_API_PHONE = os.environ.get('GREEN_API_PHONE', '34625433667')
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave-secreta-para-produccion-cambiar')
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 PORT = int(os.environ.get('PORT', 5000))
+
+# Configuración específica para Render
+RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')

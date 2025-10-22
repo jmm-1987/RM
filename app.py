@@ -268,101 +268,6 @@ def toggle_oferta(id):
     flash(f'Oferta {estado} exitosamente', 'success')
     return redirect(url_for('ofertas'))
 
-# Rutas para enviar ofertas como mensajes
-@app.route('/enviar_ofertas', methods=['GET', 'POST'])
-def enviar_ofertas():
-    if request.method == 'POST':
-        zona_id = request.form.get('zona_id')
-        oferta_id = request.form.get('oferta_id')
-        mensaje_personalizado = request.form.get('mensaje_personalizado', '')
-        destinatarios_seleccionados = request.form.get('destinatarios_seleccionados', '')
-        
-        if not zona_id or not oferta_id:
-            flash('Debe seleccionar una zona y una oferta', 'error')
-            return redirect(url_for('enviar_ofertas'))
-        
-        if not destinatarios_seleccionados:
-            flash('Debe seleccionar al menos un destinatario', 'error')
-            return redirect(url_for('enviar_ofertas'))
-        
-        zona = Zona.query.get(zona_id)
-        oferta = Oferta.query.get(oferta_id)
-        
-        # Obtener solo los clientes seleccionados
-        cliente_ids = [int(id) for id in destinatarios_seleccionados.split(',') if id.strip()]
-        clientes = Cliente.query.filter(
-            Cliente.id.in_(cliente_ids),
-            Cliente.zona_id == zona_id,
-            Cliente.activo == True
-        ).all()
-        
-        resultados = []
-        exitosos = 0
-        fallidos = 0
-        
-        for cliente in clientes:
-            # Crear mensaje personalizado con datos del cliente y oferta
-            # Generar enlace a la web pública
-            enlace_web = generar_enlace_web()
-            
-            mensaje_final = mensaje_personalizado.format(
-                nombre_cliente=cliente.nombre,
-                zona=zona.nombre,
-                titulo_oferta=oferta.titulo,
-                descripcion_oferta=oferta.descripcion,
-                precio_oferta=oferta.precio,
-                enlace_web=enlace_web
-            )
-            
-            # Enviar mensaje de texto
-            success_texto, error_msg_texto = green_api_sender.send_message(cliente.telefono, mensaje_final)
-            
-            # Enviar imagen si existe
-            success_imagen = True
-            error_msg_imagen = None
-            if oferta.imagen and success_texto:
-                imagen_path = os.path.join(app.config['UPLOAD_FOLDER'], oferta.imagen)
-                if os.path.exists(imagen_path):
-                    success_imagen, error_msg_imagen = green_api_sender.send_image(cliente.telefono, imagen_path, f"Imagen de la oferta: {oferta.titulo}")
-            
-            # Registrar envío
-            mensaje_oferta = MensajeOferta(
-                cliente_id=cliente.id,
-                oferta_id=oferta.id,
-                mensaje_personalizado=mensaje_final,
-                imagen_enviada=success_imagen,
-                mensaje_enviado=success_texto,
-                fecha_envio=datetime.now(timezone.utc) if success_texto else None,
-                error=error_msg_texto if not success_texto else error_msg_imagen if not success_imagen else None
-            )
-            db.session.add(mensaje_oferta)
-            
-            if success_texto:
-                exitosos += 1
-            else:
-                fallidos += 1
-            
-            resultados.append({
-                'cliente': cliente.nombre,
-                'telefono': cliente.telefono,
-                'exito': success_texto,
-                'imagen_enviada': success_imagen if success_texto else False,
-                'error': error_msg_texto if not success_texto else error_msg_imagen if not success_imagen else None
-            })
-        
-        db.session.commit()
-        
-        flash(f'Ofertas enviadas: {exitosos}, Fallidas: {fallidos}', 'success')
-        return render_template('resultado_envio_ofertas.html', 
-                             resultados=resultados, 
-                             zona=zona, 
-                             oferta=oferta,
-                             exitosos=exitosos,
-                             fallidos=fallidos)
-    
-    zonas = Zona.query.all()
-    ofertas = Oferta.query.filter_by(activa=True).order_by(Oferta.created_at.desc()).all()
-    return render_template('enviar_ofertas.html', zonas=zonas, ofertas=ofertas)
 
 # Rutas para la web pública
 @app.route('/panel')
@@ -445,6 +350,89 @@ def test_green_api():
         flash(f'Error enviando mensaje de prueba: {error}', 'error')
     
     return redirect(url_for('configuracion'))
+
+@app.route('/init-db')
+def init_database():
+    """Ruta para inicializar la base de datos en producción"""
+    try:
+        with app.app_context():
+            # Crear todas las tablas
+            db.create_all()
+            
+            # Verificar si ya hay datos
+            if not Zona.query.first():
+                # Crear zonas básicas
+                zonas_data = [
+                    {'nombre': 'Centro', 'descripcion': 'Zona centro de la ciudad'},
+                    {'nombre': 'Norte', 'descripcion': 'Zona norte de la ciudad'},
+                    {'nombre': 'Sur', 'descripcion': 'Zona sur de la ciudad'},
+                    {'nombre': 'Este', 'descripcion': 'Zona este de la ciudad'},
+                    {'nombre': 'Oeste', 'descripcion': 'Zona oeste de la ciudad'}
+                ]
+                
+                for zona_data in zonas_data:
+                    zona = Zona(**zona_data)
+                    db.session.add(zona)
+                
+                # Crear plantillas de mensajes
+                plantillas_data = [
+                    {
+                        'nombre': 'Visita Programada',
+                        'contenido': 'Hola {nombre_cliente}, somos de Recambios RM. Vamos a pasar por la zona {zona} mañana por la mañana. ¿Necesitas algún recambio específico? Te podemos llevar lo que necesites. ¡Gracias!'
+                    },
+                    {
+                        'nombre': 'Recordatorio de Visita',
+                        'contenido': 'Buenos días {nombre_cliente}, recordatorio: pasaremos por {zona} hoy por la tarde. Si necesitas algún recambio, avísanos antes de las 14:00. ¡Hasta pronto!'
+                    },
+                    {
+                        'nombre': 'Promoción Especial',
+                        'contenido': 'Hola {nombre_cliente}, tenemos una promoción especial esta semana. Pasaremos por {zona} con descuentos en recambios de motor. ¡No te lo pierdas!'
+                    }
+                ]
+                
+                for plantilla_data in plantillas_data:
+                    plantilla = MensajePlantilla(**plantilla_data)
+                    db.session.add(plantilla)
+                
+                # Crear ofertas de ejemplo
+                ofertas_data = [
+                    {
+                        'titulo': 'Aceite de Motor Premium',
+                        'descripcion': 'Aceite de motor de alta calidad para tu vehículo. Garantiza un rendimiento óptimo y protección del motor.',
+                        'precio': 25.99,
+                        'activa': True,
+                        'destacada': True
+                    },
+                    {
+                        'titulo': 'Filtro de Aire',
+                        'descripcion': 'Filtro de aire original para mantener el motor limpio y eficiente.',
+                        'precio': 12.50,
+                        'activa': True,
+                        'destacada': False
+                    },
+                    {
+                        'titulo': 'Pastillas de Freno',
+                        'descripcion': 'Pastillas de freno de alta calidad para una frenada segura y eficiente.',
+                        'precio': 45.00,
+                        'activa': True,
+                        'destacada': True
+                    }
+                ]
+                
+                for oferta_data in ofertas_data:
+                    oferta = Oferta(**oferta_data)
+                    db.session.add(oferta)
+                
+                db.session.commit()
+                flash('Base de datos inicializada exitosamente con datos de ejemplo', 'success')
+            else:
+                flash('Base de datos ya inicializada', 'info')
+                
+    except Exception as e:
+        flash(f'Error inicializando la base de datos: {str(e)}', 'error')
+        db.session.rollback()
+    
+    return redirect(url_for('panel'))
 
 @app.route('/eliminar_plantillas_temporales')
 def eliminar_plantillas_temporales():
