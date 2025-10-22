@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Diagnóstico Green-API{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header bg-info text-white text-center">
+                <h4><i class="fas fa-stethoscope"></i> Diagnóstico Green-API</h4>
+            </div>
+            <div class="card-body">
+                
+                <!-- Estado General -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert {% if '✅' in diagnostico.estado %}alert-success{% elif '❌' in diagnostico.estado %}alert-danger{% else %}alert-warning{% endif %}">
+                            <h5 class="alert-heading">
+                                <i class="fas fa-info-circle"></i> Estado General
+                            </h5>
+                            <p class="mb-0"><strong>{{ diagnostico.estado }}</strong></p>
+                            <small>Entorno: {{ diagnostico.entorno }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuración -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6><i class="fas fa-cog"></i> Configuración</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td><strong>URL:</strong></td>
+                                        <td><code>{{ diagnostico.configuracion.url }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Token:</strong></td>
+                                        <td><code>{{ diagnostico.configuracion.token }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Instance ID:</strong></td>
+                                        <td><code>{{ diagnostico.configuracion.instance_id }}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Teléfono:</strong></td>
+                                        <td><code>{{ diagnostico.configuracion.phone }}</code></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conexión -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header {% if diagnostico.conexion.conectado %}bg-success{% else %}bg-danger{% endif %} text-white">
+                                <h6><i class="fas fa-plug"></i> Conexión</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Estado:</strong> 
+                                    {% if diagnostico.conexion.conectado %}
+                                        <span class="text-success">✅ Conectado</span>
+                                    {% else %}
+                                        <span class="text-danger">❌ Desconectado</span>
+                                    {% endif %}
+                                </p>
+                                <p><strong>Mensaje:</strong> {{ diagnostico.conexion.mensaje }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Details -->
+                {% if diagnostico.error %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Detalles del Error</h6>
+                            <pre class="mb-0">{{ diagnostico.error }}</pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Acciones -->
+                <div class="row">
+                    <div class="col-12 text-center">
+                        <a href="{{ url_for('configuracion') }}" class="btn btn-primary">
+                            <i class="fas fa-cog"></i> Ir a Configuración
+                        </a>
+                        <a href="{{ url_for('diagnostico_green_api') }}" class="btn btn-info">
+                            <i class="fas fa-sync"></i> Actualizar Diagnóstico
+                        </a>
+                        <a href="{{ url_for('panel') }}" class="btn btn-secondary">
+                            <i class="fas fa-home"></i> Volver al Panel
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-lightbulb"></i> Soluciones Comunes</h6>
+                            <ul class="mb-0">
+                                <li><strong>Token incorrecto:</strong> Verifica que el token en las variables de entorno sea correcto</li>
+                                <li><strong>Instancia no activa:</strong> Asegúrate de que la instancia esté activa en Green-API</li>
+                                <li><strong>Número no verificado:</strong> El número debe estar verificado en WhatsApp Business</li>
+                                <li><strong>Límites de API:</strong> Verifica que no hayas excedido los límites de envío</li>
+                                <li><strong>Formato de número:</strong> Usa el formato internacional (ej: 34625433667)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

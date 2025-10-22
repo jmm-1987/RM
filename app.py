@@ -552,6 +552,49 @@ def test_green_api():
     
     return redirect(url_for('configuracion'))
 
+@app.route('/diagnostico-green-api')
+def diagnostico_green_api():
+    """Ruta de diagnóstico para verificar el estado de Green-API"""
+    diagnostico = {
+        'entorno': 'Producción' if os.environ.get('RENDER') else 'Desarrollo',
+        'configuracion': {},
+        'conexion': {},
+        'estado': 'Desconocido'
+    }
+    
+    try:
+        # Verificar configuración
+        if os.environ.get('RENDER'):
+            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+        else:
+            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+        
+        diagnostico['configuracion'] = {
+            'url': GREEN_API_URL,
+            'token': GREEN_API_TOKEN[:10] + '...' if GREEN_API_TOKEN else 'No configurado',
+            'instance_id': GREEN_API_INSTANCE_ID,
+            'phone': GREEN_API_PHONE
+        }
+        
+        # Probar conexión
+        conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+        
+        diagnostico['conexion'] = {
+            'conectado': conectado,
+            'mensaje': mensaje
+        }
+        
+        if conectado:
+            diagnostico['estado'] = '✅ Conectado y funcionando'
+        else:
+            diagnostico['estado'] = f'❌ Error: {mensaje}'
+            
+    except Exception as e:
+        diagnostico['estado'] = f'❌ Error de configuración: {str(e)}'
+        diagnostico['error'] = str(e)
+    
+    return render_template('diagnostico_green_api.html', diagnostico=diagnostico)
+
 @app.route('/setup')
 def setup():
     """Página de configuración inicial del sistema"""

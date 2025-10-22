@@ -88,6 +88,19 @@
                 </ul>
             </div>
         </div>
+        
+        <!-- Enlace de diagnóstico -->
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-stethoscope"></i> Diagnóstico</h5>
+            </div>
+            <div class="card-body text-center">
+                <p>Si tienes problemas con los mensajes de WhatsApp, ejecuta el diagnóstico:</p>
+                <a href="{{ url_for('diagnostico_green_api') }}" class="btn btn-info">
+                    <i class="fas fa-stethoscope"></i> Ejecutar Diagnóstico
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
