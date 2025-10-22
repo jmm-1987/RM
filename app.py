@@ -35,14 +35,14 @@ db.init_app(app)
 _sistema_inicializado = False
 
 def migrar_sqlite_a_postgres():
-    """Migra datos de SQLite local a PostgreSQL en producción"""
+    """Migrga datos de SQLite local a PostgreSQL en producción"""
     try:
         import sqlite3
         import psycopg2
         
         # Verificar si existe la base de datos SQLite local
         if not os.path.exists('recambios.db'):
-            print("ℹ️ No hay base de datos SQLite local para migrar")
+            print("ℹ️ No hay base de fdatos SQLite local para migrar")
             return True
         
         # Conectar a SQLite local
