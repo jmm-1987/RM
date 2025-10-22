@@ -76,13 +76,13 @@ Para cualquier problema con el despliegue, revisar:
 
 ### 🔧 Solución de Problemas Comunes
 
-#### Error: "no such table: oferta"
+#### ✅ Inicialización Automática
 
-Si encuentras este error después del despliegue:
+La aplicación se inicializa automáticamente al arrancar:
 
-1. **Visita la URL de inicialización**: `https://tu-app.onrender.com/init-db`
-2. Esto creará todas las tablas necesarias y datos de ejemplo
-3. Después podrás acceder normalmente al panel
+1. **Al primer request**: Se crean todas las tablas automáticamente
+2. **Datos de ejemplo**: Se agregan zonas, plantillas y ofertas automáticamente
+3. **Sin intervención manual**: Todo funciona sin configuración adicional
 
 #### Variables de entorno importantes:
 
@@ -90,9 +90,9 @@ Si encuentras este error después del despliegue:
 - `DATABASE_URL`: Se configura automáticamente por Render
 - `RENDER_EXTERNAL_URL`: URL externa de tu aplicación
 
-### 🔧 Configuración Post-Despliegue Actualizada
+### 🔧 Configuración Post-Despliegue
 
-1. **Inicializar base de datos**: Visita `/init-db` para crear tablas y datos
+1. **✅ Inicialización automática**: Se ejecuta al primer acceso
 2. **Acceder al panel**: `https://tu-app.onrender.com/panel`
 3. **Configurar Green-API**: Ir a Configuración y probar la conexión
 4. **Crear datos iniciales**: Usar las funciones de creación de datos
