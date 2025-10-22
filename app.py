@@ -9,14 +9,14 @@ app = Flask(__name__)
 
 # Configuración para producción
 if os.environ.get('RENDER'):
-    # Configuración para Render
+    # Configuración para Render - usar PostgreSQL
     from config import DATABASE_URL, SECRET_KEY, DEBUG, PORT
     app.config['SECRET_KEY'] = SECRET_KEY
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['DEBUG'] = DEBUG
 else:
-    # Configuración para desarrollo local
+    # Configuración para desarrollo local - usar SQLite local
     app.config['SECRET_KEY'] = 'tu_clave_secreta_aqui'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///recambios.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -33,6 +33,95 @@ db.init_app(app)
 
 # Variable para controlar la inicialización
 _sistema_inicializado = False
+
+def migrar_sqlite_a_postgres():
+    """Migra datos de SQLite local a PostgreSQL en producción"""
+    try:
+        import sqlite3
+        import psycopg2
+        
+        # Verificar si existe la base de datos SQLite local
+        if not os.path.exists('recambios.db'):
+            print("ℹ️ No hay base de datos SQLite local para migrar")
+            return True
+        
+        # Conectar a SQLite local
+        sqlite_conn = sqlite3.connect('recambios.db')
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Conectar a PostgreSQL
+        database_url = app.config['SQLALCHEMY_DATABASE_URI']
+        postgres_conn = psycopg2.connect(database_url)
+        postgres_cursor = postgres_conn.cursor()
+        
+        print("📝 Migrando datos de SQLite a PostgreSQL...")
+        
+        # Migrar zonas
+        sqlite_cursor.execute("SELECT id, nombre, descripcion FROM zona")
+        zonas = sqlite_cursor.fetchall()
+        for zona in zonas:
+            postgres_cursor.execute(
+                "INSERT INTO zona (id, nombre, descripcion) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                zona
+            )
+        
+        # Migrar clientes
+        sqlite_cursor.execute("SELECT id, nombre, telefono, zona_id, activo FROM cliente")
+        clientes = sqlite_cursor.fetchall()
+        for cliente in clientes:
+            postgres_cursor.execute(
+                "INSERT INTO cliente (id, nombre, telefono, zona_id, activo) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                cliente
+            )
+        
+        # Migrar plantillas
+        sqlite_cursor.execute("SELECT id, nombre, contenido FROM mensaje_plantilla")
+        plantillas = sqlite_cursor.fetchall()
+        for plantilla in plantillas:
+            postgres_cursor.execute(
+                "INSERT INTO mensaje_plantilla (id, nombre, contenido) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                plantilla
+            )
+        
+        # Migrar ofertas
+        sqlite_cursor.execute("SELECT id, titulo, descripcion, precio, imagen, activa, destacada, created_at, updated_at FROM oferta")
+        ofertas = sqlite_cursor.fetchall()
+        for oferta in ofertas:
+            postgres_cursor.execute(
+                "INSERT INTO oferta (id, titulo, descripcion, precio, imagen, activa, destacada, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                oferta
+            )
+        
+        # Migrar mensajes enviados
+        sqlite_cursor.execute("SELECT id, cliente_id, plantilla_id, mensaje_personalizado, mensaje_enviado, fecha_envio, error FROM mensaje_enviado")
+        mensajes = sqlite_cursor.fetchall()
+        for mensaje in mensajes:
+            postgres_cursor.execute(
+                "INSERT INTO mensaje_enviado (id, cliente_id, plantilla_id, mensaje_personalizado, mensaje_enviado, fecha_envio, error) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                mensaje
+            )
+        
+        # Migrar mensajes de ofertas
+        sqlite_cursor.execute("SELECT id, cliente_id, oferta_id, mensaje_personalizado, imagen_enviada, mensaje_enviado, fecha_envio, error FROM mensaje_oferta")
+        mensajes_ofertas = sqlite_cursor.fetchall()
+        for mensaje_oferta in mensajes_ofertas:
+            postgres_cursor.execute(
+                "INSERT INTO mensaje_oferta (id, cliente_id, oferta_id, mensaje_personalizado, imagen_enviada, mensaje_enviado, fecha_envio, error) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+                mensaje_oferta
+            )
+        
+        postgres_conn.commit()
+        print("✅ Migración completada exitosamente!")
+        print(f"- Zonas: {len(zonas)}, Clientes: {len(clientes)}, Plantillas: {len(plantillas)}")
+        print(f"- Ofertas: {len(ofertas)}, Mensajes: {len(mensajes)}, Mensajes Ofertas: {len(mensajes_ofertas)}")
+        
+        sqlite_conn.close()
+        postgres_conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error en migración: {e}")
+        return False
 
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""

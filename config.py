@@ -10,7 +10,7 @@ if DATABASE_URL.startswith('postgres://'):
 
 # Configuración de Green-API desde variables de entorno
 GREEN_API_URL = os.environ.get('GREEN_API_URL', 'https://7107.api.green-api.com')
-GREEN_API_TOKEN = os.environ.get('GREEN_API_TOKEN', 'TU_TOKEN_AQUI')
+GREEN_API_TOKEN = os.environ.get('GREEN_API_TOKEN', '3dd7b31137204b0ca3c233fd4f7ebda4cb0f594076244419ba')
 GREEN_API_INSTANCE_ID = os.environ.get('GREEN_API_INSTANCE_ID', '7107349111')
 GREEN_API_PHONE = os.environ.get('GREEN_API_PHONE', '34625433667')
 

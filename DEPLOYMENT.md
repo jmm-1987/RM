@@ -21,7 +21,7 @@ Sistema completo de gestión para distribución de recambios con envío de mensa
    SECRET_KEY=tu-clave-secreta-muy-segura-aqui
    DEBUG=false
    GREEN_API_URL=https://7107.api.green-api.com
-   GREEN_API_TOKEN=tu-token-real-de-green-api
+   GREEN_API_TOKEN=3dd7b31137204b0ca3c233fd4f7ebda4cb0f594076244419ba
    GREEN_API_INSTANCE_ID=7107349111
    GREEN_API_PHONE=34625433667
    ```
@@ -76,13 +76,22 @@ Para cualquier problema con el despliegue, revisar:
 
 ### 🔧 Solución de Problemas Comunes
 
-#### ✅ Inicialización Automática
+#### ✅ Usar Base de Datos Local en Producción
 
-La aplicación se inicializa automáticamente al arrancar:
+Para usar la misma base de datos que tienes localmente:
 
-1. **Al primer request**: Se crean todas las tablas automáticamente
-2. **Datos de ejemplo**: Se agregan zonas, plantillas y ofertas automáticamente
-3. **Sin intervención manual**: Todo funciona sin configuración adicional
+1. **Subir la base de datos local**:
+   - El archivo `recambios.db` se sube automáticamente a GitHub
+   - Render usará esta base de datos como punto de partida
+
+2. **Migración automática**:
+   - Render detecta la base de datos SQLite local
+   - La migra automáticamente a PostgreSQL
+   - Mantiene todos tus datos existentes
+
+3. **Sin pérdida de datos**:
+   - Todos los clientes, zonas, ofertas y mensajes se mantienen
+   - La aplicación funciona inmediatamente con tus datos
 
 #### Variables de entorno importantes:
 
@@ -92,8 +101,19 @@ La aplicación se inicializa automáticamente al arrancar:
 
 ### 🔧 Configuración Post-Despliegue
 
-1. **✅ Inicialización automática**: Se ejecuta al primer acceso
-2. **Acceder al panel**: `https://tu-app.onrender.com/panel`
-3. **Configurar Green-API**: Ir a Configuración y probar la conexión
-4. **Crear datos iniciales**: Usar las funciones de creación de datos
-5. **Subir imágenes**: Las ofertas pueden incluir imágenes
+1. **✅ Base de datos automática**: Se migra desde SQLite local a PostgreSQL
+2. **✅ Green-API automático**: Se configura automáticamente con tus credenciales
+3. **Acceder al panel**: `https://tu-app.onrender.com/panel`
+4. **Verificar datos**: Todos tus datos locales estarán disponibles
+5. **Probar envíos**: Los mensajes WhatsApp funcionarán inmediatamente
+
+### 📱 Configuración de Green-API
+
+Tu configuración de Green-API ya está incluida:
+
+- **URL**: `https://7107.api.green-api.com`
+- **Token**: `3dd7b31137204b0ca3c233fd4f7ebda4cb0f594076244419ba`
+- **Instancia**: `7107349111`
+- **Teléfono**: `34625433667`
+
+**✅ No necesitas configuración adicional** - Todo funciona automáticamente.

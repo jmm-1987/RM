@@ -27,14 +27,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# Base de datos local
-instance/
-*.db
-*.sqlite
-*.sqlite3
+# Base de datos local - COMENTADO PARA SUBIR LA BD A GITHUB
+# instance/
+# *.db
+# *.sqlite
+# *.sqlite3
 
-# Archivos de configuración local
-green_api_config.py
+# Archivos de configuración local - COMENTADO PARA SUBIR A GITHUB
+# green_api_config.py
 
 # Archivos de uploads (opcional, comentar si quieres mantener las imágenes)
 static/uploads/*.png
