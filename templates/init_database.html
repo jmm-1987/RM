@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Inicialización del Sistema{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white text-center">
+                <h4><i class="fas fa-cog"></i> Inicialización del Sistema</h4>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-database fa-4x text-primary mb-3"></i>
+                    <h5>Base de Datos No Inicializada</h5>
+                    <p class="text-muted">
+                        El sistema necesita crear las tablas y datos iniciales para funcionar correctamente.
+                    </p>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> ¿Qué se creará?</h6>
+                    <ul class="list-unstyled text-start">
+                        <li><i class="fas fa-check text-success"></i> <strong>5 Zonas de reparto</strong> (Centro, Norte, Sur, Este, Oeste)</li>
+                        <li><i class="fas fa-check text-success"></i> <strong>3 Plantillas de mensajes</strong> (Visita Programada, Recordatorio, Promoción)</li>
+                        <li><i class="fas fa-check text-success"></i> <strong>3 Ofertas de ejemplo</strong> (Aceite, Filtro, Pastillas)</li>
+                        <li><i class="fas fa-check text-success"></i> <strong>Todas las tablas necesarias</strong> para el funcionamiento</li>
+                    </ul>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('init_database') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-play"></i> Inicializar Sistema
+                    </a>
+                    <small class="text-muted">
+                        Este proceso solo se ejecuta una vez y es seguro
+                    </small>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Después de la inicialización podrás:</h6>
+                    <div class="row text-start">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-users text-primary"></i> Gestionar clientes</li>
+                                <li><i class="fas fa-comment text-primary"></i> Crear plantillas de mensajes</li>
+                                <li><i class="fas fa-paper-plane text-primary"></i> Enviar mensajes masivos</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-tags text-primary"></i> Crear ofertas</li>
+                                <li><i class="fas fa-history text-primary"></i> Ver historial</li>
+                                <li><i class="fas fa-cog text-primary"></i> Configurar Green-API</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

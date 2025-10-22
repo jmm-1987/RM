@@ -31,6 +31,24 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 
+def check_database_initialized():
+    """Verifica si la base de datos está inicializada"""
+    try:
+        # Intentar hacer una consulta simple
+        Zona.query.first()
+        return True
+    except Exception:
+        return False
+
+@app.before_request
+def before_request():
+    """Middleware para verificar la inicialización de la base de datos"""
+    # Rutas que no requieren base de datos inicializada
+    exempt_routes = ['setup', 'init_database', 'static']
+    
+    if request.endpoint not in exempt_routes and not check_database_initialized():
+        return redirect(url_for('setup'))
+
 def generar_enlace_web():
     """Genera el enlace completo a la web pública de ofertas"""
     if os.environ.get('RENDER'):
@@ -350,6 +368,11 @@ def test_green_api():
         flash(f'Error enviando mensaje de prueba: {error}', 'error')
     
     return redirect(url_for('configuracion'))
+
+@app.route('/setup')
+def setup():
+    """Página de configuración inicial del sistema"""
+    return render_template('init_database.html')
 
 @app.route('/init-db')
 def init_database():
