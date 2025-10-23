@@ -1106,6 +1106,101 @@ def activar_polling():
     """Página para activar el polling automático"""
     return render_template('activar_polling.html')
 
+# Rutas para WhatsApp Web integrado
+@app.route('/whatsapp-web')
+def whatsapp_web():
+    """Interfaz tipo WhatsApp Web integrada"""
+    return render_template('whatsapp_web.html')
+
+@app.route('/api/conversaciones')
+def api_conversaciones():
+    """API para obtener lista de conversaciones"""
+    try:
+        # Obtener conversaciones únicas con información del último mensaje
+        conversaciones = db.session.query(
+            MensajeRecibido.telefono_remitente,
+            MensajeRecibido.nombre_remitente,
+            db.func.max(MensajeRecibido.fecha_recepcion).label('ultima_fecha'),
+            db.func.count(MensajeRecibido.id).label('total_mensajes'),
+            db.func.sum(db.case([(MensajeRecibido.leido == False, 1)], else_=0)).label('no_leidos')
+        ).group_by(
+            MensajeRecibido.telefono_remitente,
+            MensajeRecibido.nombre_remitente
+        ).order_by(db.desc('ultima_fecha')).all()
+        
+        resultado = []
+        for conv in conversaciones:
+            # Obtener el último mensaje
+            ultimo_mensaje = MensajeRecibido.query.filter_by(
+                telefono_remitente=conv.telefono_remitente
+            ).order_by(MensajeRecibido.fecha_recepcion.desc()).first()
+            
+            resultado.append({
+                'telefono': conv.telefono_remitente,
+                'nombre': conv.nombre_remitente,
+                'ultimo_mensaje': ultimo_mensaje.mensaje[:50] + '...' if ultimo_mensaje and len(ultimo_mensaje.mensaje) > 50 else ultimo_mensaje.mensaje if ultimo_mensaje else '',
+                'ultima_fecha': conv.ultima_fecha.isoformat(),
+                'total_mensajes': conv.total_mensajes,
+                'no_leidos': conv.no_leidos or 0,
+                'id': hash(conv.telefono_remitente) % 1000000  # ID único simple
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Error obteniendo conversaciones: {e}")
+        return jsonify([])
+
+@app.route('/api/mensajes/<telefono>')
+def api_mensajes_telefono(telefono):
+    """API para obtener mensajes de una conversación específica"""
+    try:
+        # Obtener mensajes recibidos
+        mensajes_recibidos = MensajeRecibido.query.filter_by(
+            telefono_remitente=telefono
+        ).order_by(MensajeRecibido.fecha_recepcion.asc()).all()
+        
+        # Obtener respuestas enviadas
+        respuestas_enviadas = []
+        for msg in mensajes_recibidos:
+            respuestas = RespuestaMensaje.query.filter_by(
+                mensaje_recibido_id=msg.id
+            ).all()
+            respuestas_enviadas.extend(respuestas)
+        
+        # Combinar y ordenar
+        conversacion = []
+        
+        # Agregar mensajes recibidos
+        for msg in mensajes_recibidos:
+            conversacion.append({
+                'tipo': 'recibido',
+                'mensaje': msg.mensaje,
+                'fecha': msg.fecha_recepcion.isoformat(),
+                'tipo_mensaje': msg.tipo_mensaje,
+                'archivo_url': msg.archivo_url,
+                'leido': msg.leido
+            })
+        
+        # Agregar respuestas enviadas
+        for resp in respuestas_enviadas:
+            conversacion.append({
+                'tipo': 'enviado',
+                'mensaje': resp.respuesta,
+                'fecha': resp.fecha_envio.isoformat() if resp.fecha_envio else resp.created_at.isoformat(),
+                'tipo_mensaje': 'texto',
+                'enviado': resp.enviado
+            })
+        
+        # Ordenar por fecha
+        conversacion.sort(key=lambda x: x['fecha'])
+        
+        return jsonify(conversacion)
+        
+    except Exception as e:
+        print(f"Error obteniendo mensajes: {e}")
+        return jsonify([])
+
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""
     try:
