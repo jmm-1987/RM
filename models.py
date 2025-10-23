@@ -90,3 +90,37 @@ class MensajeOferta(db.Model):
     
     def __repr__(self):
         return f'<MensajeOferta {self.id}>'
+
+class MensajeRecibido(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    telefono_remitente = db.Column(db.String(20), nullable=False)
+    nombre_remitente = db.Column(db.String(100))
+    mensaje = db.Column(db.Text, nullable=False)
+    tipo_mensaje = db.Column(db.String(20), default='texto')  # texto, imagen, audio, etc.
+    archivo_url = db.Column(db.String(500))  # URL del archivo si es multimedia
+    leido = db.Column(db.Boolean, default=False)
+    respondido = db.Column(db.Boolean, default=False)
+    fecha_recepcion = db.Column(db.DateTime, default=datetime.utcnow)
+    id_mensaje_whatsapp = db.Column(db.String(100))  # ID del mensaje en WhatsApp
+    
+    # Relación opcional con cliente existente
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)
+    cliente = db.relationship('Cliente', backref='mensajes_recibidos')
+    
+    def __repr__(self):
+        return f'<MensajeRecibido {self.id} de {self.telefono_remitente}>'
+
+class RespuestaMensaje(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    mensaje_recibido_id = db.Column(db.Integer, db.ForeignKey('mensaje_recibido.id'), nullable=False)
+    respuesta = db.Column(db.Text, nullable=False)
+    enviado = db.Column(db.Boolean, default=False)
+    fecha_envio = db.Column(db.DateTime)
+    error = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relación
+    mensaje_recibido = db.relationship('MensajeRecibido', backref='respuestas')
+    
+    def __repr__(self):
+        return f'<RespuestaMensaje {self.id}>'

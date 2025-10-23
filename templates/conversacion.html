@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Conversación - {{ telefono }} - Recambios RM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-comments"></i> Conversación con {{ nombre or telefono }}</h2>
+                <div>
+                    <span class="badge badge-info">{{ telefono }}</span>
+                    <a href="{{ url_for('mensajes_recibidos') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </a>
+                </div>
+            </div>
+
+            <!-- Área de conversación -->
+            <div class="card">
+                <div class="card-body" style="height: 500px; overflow-y: auto;">
+                    {% for msg in conversacion %}
+                    <div class="mb-3 {% if msg.tipo == 'enviado' %}text-right{% endif %}">
+                        <div class="d-inline-block p-3 rounded {% if msg.tipo == 'enviado' %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 70%;">
+                            <div class="mb-1">
+                                {% if msg.tipo_mensaje == 'imagen' %}
+                                    <i class="fas fa-image"></i> Imagen
+                                    {% if msg.archivo_url %}
+                                        <br><a href="{{ msg.archivo_url }}" target="_blank" class="{% if msg.tipo == 'enviado' %}text-white{% else %}text-primary{% endif %}">
+                                            <i class="fas fa-download"></i> Descargar
+                                        </a>
+                                    {% endif %}
+                                {% elif msg.tipo_mensaje == 'audio' %}
+                                    <i class="fas fa-microphone"></i> Audio
+                                    {% if msg.archivo_url %}
+                                        <br><a href="{{ msg.archivo_url }}" target="_blank" class="{% if msg.tipo == 'enviado' %}text-white{% else %}text-primary{% endif %}">
+                                            <i class="fas fa-download"></i> Descargar
+                                        </a>
+                                    {% endif %}
+                                {% elif msg.tipo_mensaje == 'video' %}
+                                    <i class="fas fa-video"></i> Video
+                                    {% if msg.archivo_url %}
+                                        <br><a href="{{ msg.archivo_url }}" target="_blank" class="{% if msg.tipo == 'enviado' %}text-white{% else %}text-primary{% endif %}">
+                                            <i class="fas fa-download"></i> Descargar
+                                        </a>
+                                    {% endif %}
+                                {% elif msg.tipo_mensaje == 'documento' %}
+                                    <i class="fas fa-file"></i> Documento
+                                    {% if msg.archivo_url %}
+                                        <br><a href="{{ msg.archivo_url }}" target="_blank" class="{% if msg.tipo == 'enviado' %}text-white{% else %}text-primary{% endif %}">
+                                            <i class="fas fa-download"></i> Descargar
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <div>{{ msg.mensaje }}</div>
+                            <small class="{% if msg.tipo == 'enviado' %}text-white-50{% else %}text-muted{% endif %}">
+                                {{ msg.fecha.strftime('%d/%m/%Y %H:%M') }}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if not conversacion %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay mensajes en esta conversación</h5>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Formulario para responder -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-reply"></i> Responder</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('responder_mensaje', mensaje_id=conversacion[0].id if conversacion else 0) }}">
+                        <div class="form-group">
+                            <label>Para:</label>
+                            <input type="text" class="form-control" value="{{ telefono }}" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Respuesta:</label>
+                            <textarea name="respuesta" class="form-control" rows="3" placeholder="Escribe tu respuesta aquí..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-paper-plane"></i> Enviar Respuesta
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
-from models import db, Zona, Cliente, MensajePlantilla, MensajeEnviado, Oferta, MensajeOferta
+from models import db, Zona, Cliente, MensajePlantilla, MensajeEnviado, Oferta, MensajeOferta, MensajeRecibido, RespuestaMensaje
 from whatsapp_sender import enviar_whatsapp, configurar_green_api, green_api_sender
 from datetime import datetime, timezone
 import os
@@ -260,6 +260,125 @@ def clientes():
     zonas = Zona.query.all()
     return render_template('clientes.html', clientes=clientes, zonas=zonas, zona_seleccionada=zona_id)
 
+@app.route('/clientes/editar/<int:cliente_id>', methods=['GET', 'POST'])
+def editar_cliente(cliente_id):
+    cliente = Cliente.query.get_or_404(cliente_id)
+    
+    if request.method == 'POST':
+        cliente.nombre = request.form.get('nombre')
+        cliente.telefono = request.form.get('telefono')
+        cliente.zona_id = request.form.get('zona_id', type=int)
+        
+        if not cliente.nombre or not cliente.telefono or not cliente.zona_id:
+            flash('Todos los campos son obligatorios', 'error')
+            return redirect(url_for('editar_cliente', cliente_id=cliente_id))
+        
+        try:
+            db.session.commit()
+            flash('Cliente actualizado exitosamente', 'success')
+            return redirect(url_for('clientes'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error actualizando cliente: {str(e)}', 'error')
+            return redirect(url_for('editar_cliente', cliente_id=cliente_id))
+    
+    zonas = Zona.query.all()
+    return render_template('editar_cliente.html', cliente=cliente, zonas=zonas)
+
+@app.route('/clientes/eliminar/<int:cliente_id>', methods=['POST'])
+def eliminar_cliente(cliente_id):
+    cliente = Cliente.query.get_or_404(cliente_id)
+    
+    try:
+        # En lugar de eliminar, marcar como inactivo
+        cliente.activo = False
+        db.session.commit()
+        flash(f'Cliente {cliente.nombre} desactivado exitosamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error desactivando cliente: {str(e)}', 'error')
+    
+    return redirect(url_for('clientes'))
+
+@app.route('/zonas')
+def zonas():
+    zonas = Zona.query.all()
+    return render_template('zonas.html', zonas=zonas)
+
+@app.route('/zonas/editar/<int:zona_id>', methods=['GET', 'POST'])
+def editar_zona(zona_id):
+    zona = Zona.query.get_or_404(zona_id)
+    
+    if request.method == 'POST':
+        zona.nombre = request.form.get('nombre')
+        zona.descripcion = request.form.get('descripcion')
+        
+        if not zona.nombre:
+            flash('El nombre de la zona es obligatorio', 'error')
+            return redirect(url_for('editar_zona', zona_id=zona_id))
+        
+        try:
+            db.session.commit()
+            flash('Zona actualizada exitosamente', 'success')
+            return redirect(url_for('zonas'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error actualizando zona: {str(e)}', 'error')
+            return redirect(url_for('editar_zona', zona_id=zona_id))
+    
+    return render_template('editar_zona.html', zona=zona)
+
+@app.route('/zonas/eliminar/<int:zona_id>', methods=['POST'])
+def eliminar_zona(zona_id):
+    zona = Zona.query.get_or_404(zona_id)
+    
+    # Verificar si hay clientes en esta zona
+    clientes_en_zona = Cliente.query.filter_by(zona_id=zona_id, activo=True).count()
+    
+    if clientes_en_zona > 0:
+        flash(f'No se puede eliminar la zona {zona.nombre} porque tiene {clientes_en_zona} cliente(s) activo(s)', 'error')
+        return redirect(url_for('zonas'))
+    
+    try:
+        db.session.delete(zona)
+        db.session.commit()
+        flash(f'Zona {zona.nombre} eliminada exitosamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error eliminando zona: {str(e)}', 'error')
+    
+    return redirect(url_for('zonas'))
+
+@app.route('/actualizar-plantillas-con-enlace')
+def actualizar_plantillas_con_enlace():
+    """Ruta temporal para actualizar las plantillas existentes con el enlace web"""
+    try:
+        plantillas = MensajePlantilla.query.all()
+        actualizadas = 0
+        
+        for plantilla in plantillas:
+            # Solo actualizar si no tiene el enlace web
+            if '{enlace_web}' not in plantilla.contenido:
+                if 'Visita Programada' in plantilla.nombre:
+                    plantilla.contenido += '\n\n🌐 Consulta nuestras ofertas actuales: {enlace_web}'
+                elif 'Recordatorio' in plantilla.nombre:
+                    plantilla.contenido += '\n\n🌐 Ve nuestras ofertas: {enlace_web}'
+                elif 'Promoción' in plantilla.nombre:
+                    plantilla.contenido += '\n\n🌐 Descubre todas nuestras ofertas: {enlace_web}'
+                else:
+                    plantilla.contenido += '\n\n🌐 Consulta nuestras ofertas: {enlace_web}'
+                
+                actualizadas += 1
+        
+        db.session.commit()
+        flash(f'Se actualizaron {actualizadas} plantillas con el enlace web', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error actualizando plantillas: {str(e)}', 'error')
+    
+    return redirect(url_for('mensajes'))
+
 @app.route('/mensajes')
 def mensajes():
     plantillas = MensajePlantilla.query.filter_by(activo=True).all()
@@ -295,10 +414,14 @@ def enviar_masivo():
         fallidos = 0
         
         for cliente in clientes:
-            # Personalizar mensaje con datos del cliente
+            # Generar enlace a la web pública de ofertas
+            enlace_web = generar_enlace_web()
+            
+            # Personalizar mensaje con datos del cliente y enlace web
             mensaje_personalizado = plantilla.contenido.format(
                 nombre_cliente=cliente.nombre,
-                zona=zona.nombre
+                zona=zona.nombre,
+                enlace_web=enlace_web
             )
             
             # Enviar mensaje usando Green-API
@@ -627,15 +750,15 @@ def init_database():
                 plantillas_data = [
                     {
                         'nombre': 'Visita Programada',
-                        'contenido': 'Hola {nombre_cliente}, somos de Recambios RM. Vamos a pasar por la zona {zona} mañana por la mañana. ¿Necesitas algún recambio específico? Te podemos llevar lo que necesites. ¡Gracias!'
+                        'contenido': 'Hola {nombre_cliente}, somos de Recambios RM. Vamos a pasar por la zona {zona} mañana por la mañana. ¿Necesitas algún recambio específico? Te podemos llevar lo que necesites.\n\n🌐 Consulta nuestras ofertas actuales: {enlace_web}\n\n¡Gracias!'
                     },
                     {
                         'nombre': 'Recordatorio de Visita',
-                        'contenido': 'Buenos días {nombre_cliente}, recordatorio: pasaremos por {zona} hoy por la tarde. Si necesitas algún recambio, avísanos antes de las 14:00. ¡Hasta pronto!'
+                        'contenido': 'Buenos días {nombre_cliente}, recordatorio: pasaremos por {zona} hoy por la tarde. Si necesitas algún recambio, avísanos antes de las 14:00.\n\n🌐 Ve nuestras ofertas: {enlace_web}\n\n¡Hasta pronto!'
                     },
                     {
                         'nombre': 'Promoción Especial',
-                        'contenido': 'Hola {nombre_cliente}, tenemos una promoción especial esta semana. Pasaremos por {zona} con descuentos en recambios de motor. ¡No te lo pierdas!'
+                        'contenido': 'Hola {nombre_cliente}, tenemos una promoción especial esta semana. Pasaremos por {zona} con descuentos en recambios de motor.\n\n🌐 Descubre todas nuestras ofertas: {enlace_web}\n\n¡No te lo pierdas!'
                     }
                 ]
                 
@@ -699,6 +822,189 @@ def eliminar_plantillas_temporales():
     
     flash(f'Plantillas eliminadas: {", ".join(eliminadas)}', 'success')
     return redirect(url_for('mensajes'))
+
+# Rutas para mensajes recibidos
+@app.route('/webhook/whatsapp', methods=['POST'])
+def webhook_whatsapp():
+    """Webhook para recibir mensajes de Green-API"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data received'}), 400
+        
+        # Procesar mensaje recibido
+        mensaje_data = data.get('body', {})
+        
+        if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
+            # Extraer información del mensaje
+            message_data = mensaje_data.get('messageData', {})
+            sender_data = mensaje_data.get('senderData', {})
+            
+            # Obtener número de teléfono del remitente
+            telefono_remitente = sender_data.get('sender', '').replace('@c.us', '')
+            
+            # Obtener el mensaje
+            mensaje_texto = ''
+            tipo_mensaje = 'texto'
+            archivo_url = None
+            
+            if 'textMessageData' in message_data:
+                mensaje_texto = message_data['textMessageData'].get('textMessage', '')
+                tipo_mensaje = 'texto'
+            elif 'extendedTextMessageData' in message_data:
+                mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
+                tipo_mensaje = 'texto'
+            elif 'imageMessageData' in message_data:
+                mensaje_texto = message_data['imageMessageData'].get('caption', '')
+                tipo_mensaje = 'imagen'
+                archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
+            elif 'documentMessageData' in message_data:
+                mensaje_texto = message_data['documentMessageData'].get('caption', '')
+                tipo_mensaje = 'documento'
+                archivo_url = message_data['documentMessageData'].get('downloadUrl', '')
+            elif 'audioMessageData' in message_data:
+                mensaje_texto = '[Mensaje de audio]'
+                tipo_mensaje = 'audio'
+                archivo_url = message_data['audioMessageData'].get('downloadUrl', '')
+            elif 'videoMessageData' in message_data:
+                mensaje_texto = message_data['videoMessageData'].get('caption', '')
+                tipo_mensaje = 'video'
+                archivo_url = message_data['videoMessageData'].get('downloadUrl', '')
+            
+            # Buscar si el remitente es un cliente existente
+            cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
+            
+            # Crear registro del mensaje recibido
+            mensaje_recibido = MensajeRecibido(
+                telefono_remitente=telefono_remitente,
+                nombre_remitente=sender_data.get('senderName', ''),
+                mensaje=mensaje_texto,
+                tipo_mensaje=tipo_mensaje,
+                archivo_url=archivo_url,
+                cliente_id=cliente_existente.id if cliente_existente else None,
+                id_mensaje_whatsapp=mensaje_data.get('idMessage', '')
+            )
+            
+            db.session.add(mensaje_recibido)
+            db.session.commit()
+            
+            print(f"✅ Mensaje recibido de {telefono_remitente}: {mensaje_texto[:50]}...")
+            
+            return jsonify({'status': 'success', 'message': 'Message processed'}), 200
+        
+        return jsonify({'status': 'ignored', 'message': 'Not an incoming message'}), 200
+        
+    except Exception as e:
+        print(f"❌ Error procesando webhook: {e}")
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/mensajes-recibidos')
+def mensajes_recibidos():
+    """Página para ver mensajes recibidos"""
+    # Obtener mensajes no leídos primero, luego los leídos
+    mensajes_no_leidos = MensajeRecibido.query.filter_by(leido=False).order_by(MensajeRecibido.fecha_recepcion.desc()).all()
+    mensajes_leidos = MensajeRecibido.query.filter_by(leido=True).order_by(MensajeRecibido.fecha_recepcion.desc()).limit(50).all()
+    
+    return render_template('mensajes_recibidos.html', 
+                         mensajes_no_leidos=mensajes_no_leidos,
+                         mensajes_leidos=mensajes_leidos)
+
+@app.route('/mensajes-recibidos/<int:mensaje_id>/marcar-leido', methods=['POST'])
+def marcar_mensaje_leido(mensaje_id):
+    """Marcar un mensaje como leído"""
+    mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
+    mensaje.leido = True
+    db.session.commit()
+    
+    return jsonify({'status': 'success'})
+
+@app.route('/mensajes-recibidos/<int:mensaje_id>/responder', methods=['POST'])
+def responder_mensaje(mensaje_id):
+    """Responder a un mensaje recibido"""
+    mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
+    respuesta_texto = request.form.get('respuesta')
+    
+    if not respuesta_texto:
+        flash('Debe escribir una respuesta', 'error')
+        return redirect(url_for('mensajes_recibidos'))
+    
+    try:
+        # Enviar respuesta usando Green-API
+        success, error_msg = green_api_sender.send_message(mensaje.telefono_remitente, respuesta_texto)
+        
+        # Crear registro de la respuesta
+        respuesta = RespuestaMensaje(
+            mensaje_recibido_id=mensaje.id,
+            respuesta=respuesta_texto,
+            enviado=success,
+            fecha_envio=datetime.now(timezone.utc) if success else None,
+            error=error_msg if not success else None
+        )
+        
+        db.session.add(respuesta)
+        
+        # Marcar mensaje original como respondido si se envió correctamente
+        if success:
+            mensaje.respondido = True
+        
+        db.session.commit()
+        
+        if success:
+            flash('Respuesta enviada exitosamente', 'success')
+        else:
+            flash(f'Error enviando respuesta: {error_msg}', 'error')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error procesando respuesta: {str(e)}', 'error')
+    
+    return redirect(url_for('mensajes_recibidos'))
+
+@app.route('/mensajes-recibidos/<int:mensaje_id>/ver-conversacion')
+def ver_conversacion(mensaje_id):
+    """Ver la conversación completa con un cliente"""
+    mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
+    
+    # Obtener todos los mensajes recibidos de este número
+    mensajes_recibidos = MensajeRecibido.query.filter_by(telefono_remitente=mensaje.telefono_remitente).order_by(MensajeRecibido.fecha_recepcion.asc()).all()
+    
+    # Obtener todas las respuestas enviadas a este número
+    respuestas_enviadas = []
+    for msg in mensajes_recibidos:
+        respuestas = RespuestaMensaje.query.filter_by(mensaje_recibido_id=msg.id).all()
+        respuestas_enviadas.extend(respuestas)
+    
+    # Combinar y ordenar cronológicamente
+    conversacion = []
+    
+    # Agregar mensajes recibidos
+    for msg in mensajes_recibidos:
+        conversacion.append({
+            'tipo': 'recibido',
+            'fecha': msg.fecha_recepcion,
+            'mensaje': msg.mensaje,
+            'tipo_mensaje': msg.tipo_mensaje,
+            'archivo_url': msg.archivo_url
+        })
+    
+    # Agregar respuestas enviadas
+    for resp in respuestas_enviadas:
+        conversacion.append({
+            'tipo': 'enviado',
+            'fecha': resp.fecha_envio,
+            'mensaje': resp.respuesta,
+            'tipo_mensaje': 'texto'
+        })
+    
+    # Ordenar por fecha
+    conversacion.sort(key=lambda x: x['fecha'])
+    
+    return render_template('conversacion.html', 
+                         conversacion=conversacion,
+                         telefono=mensaje.telefono_remitente,
+                         nombre=mensaje.nombre_remitente)
 
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""

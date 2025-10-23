@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Mensajes Recibidos - Recambios RM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-inbox"></i> Mensajes Recibidos</h2>
+                <div>
+                    <span class="badge badge-danger">{{ mensajes_no_leidos|length }} sin leer</span>
+                    <span class="badge badge-secondary">{{ mensajes_leidos|length }} leídos</span>
+                </div>
+            </div>
+
+            <!-- Mensajes no leídos -->
+            {% if mensajes_no_leidos %}
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-circle"></i> Mensajes Sin Leer ({{ mensajes_no_leidos|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% for mensaje in mensajes_no_leidos %}
+                    <div class="border-bottom p-3 {% if not mensaje.leido %}bg-light{% endif %}">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-start">
+                                    <div class="mr-3">
+                                        {% if mensaje.tipo_mensaje == 'imagen' %}
+                                            <i class="fas fa-image text-primary fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'audio' %}
+                                            <i class="fas fa-microphone text-warning fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'video' %}
+                                            <i class="fas fa-video text-danger fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'documento' %}
+                                            <i class="fas fa-file text-info fa-2x"></i>
+                                        {% else %}
+                                            <i class="fas fa-comment text-success fa-2x"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <strong>{{ mensaje.nombre_remitente or mensaje.telefono_remitente }}</strong>
+                                            <small class="text-muted">({{ mensaje.telefono_remitente }})</small>
+                                            {% if mensaje.cliente %}
+                                                <span class="badge badge-success">Cliente</span>
+                                            {% endif %}
+                                        </h6>
+                                        <p class="mb-2">{{ mensaje.mensaje }}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock"></i> {{ mensaje.fecha_recepcion.strftime('%d/%m/%Y %H:%M') }}
+                                            {% if mensaje.archivo_url %}
+                                                <a href="{{ mensaje.archivo_url }}" target="_blank" class="ml-2">
+                                                    <i class="fas fa-download"></i> Descargar archivo
+                                                </a>
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div class="btn-group-vertical">
+                                    <button class="btn btn-sm btn-outline-primary mb-1" onclick="marcarLeido({{ mensaje.id }})">
+                                        <i class="fas fa-check"></i> Marcar leído
+                                    </button>
+                                    <a href="{{ url_for('ver_conversacion', mensaje_id=mensaje.id) }}" class="btn btn-sm btn-outline-info mb-1">
+                                        <i class="fas fa-comments"></i> Ver conversación
+                                    </a>
+                                    <button class="btn btn-sm btn-success" onclick="mostrarRespuesta({{ mensaje.id }}, '{{ mensaje.telefono_remitente }}')">
+                                        <i class="fas fa-reply"></i> Responder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Mensajes leídos -->
+            {% if mensajes_leidos %}
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-circle"></i> Mensajes Leídos ({{ mensajes_leidos|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% for mensaje in mensajes_leidos %}
+                    <div class="border-bottom p-3">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-start">
+                                    <div class="mr-3">
+                                        {% if mensaje.tipo_mensaje == 'imagen' %}
+                                            <i class="fas fa-image text-primary fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'audio' %}
+                                            <i class="fas fa-microphone text-warning fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'video' %}
+                                            <i class="fas fa-video text-danger fa-2x"></i>
+                                        {% elif mensaje.tipo_mensaje == 'documento' %}
+                                            <i class="fas fa-file text-info fa-2x"></i>
+                                        {% else %}
+                                            <i class="fas fa-comment text-success fa-2x"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <strong>{{ mensaje.nombre_remitente or mensaje.telefono_remitente }}</strong>
+                                            <small class="text-muted">({{ mensaje.telefono_remitente }})</small>
+                                            {% if mensaje.cliente %}
+                                                <span class="badge badge-success">Cliente</span>
+                                            {% endif %}
+                                            {% if mensaje.respondido %}
+                                                <span class="badge badge-primary">Respondido</span>
+                                            {% endif %}
+                                        </h6>
+                                        <p class="mb-2">{{ mensaje.mensaje }}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock"></i> {{ mensaje.fecha_recepcion.strftime('%d/%m/%Y %H:%M') }}
+                                            {% if mensaje.archivo_url %}
+                                                <a href="{{ mensaje.archivo_url }}" target="_blank" class="ml-2">
+                                                    <i class="fas fa-download"></i> Descargar archivo
+                                                </a>
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <div class="btn-group-vertical">
+                                    <a href="{{ url_for('ver_conversacion', mensaje_id=mensaje.id) }}" class="btn btn-sm btn-outline-info mb-1">
+                                        <i class="fas fa-comments"></i> Ver conversación
+                                    </a>
+                                    <button class="btn btn-sm btn-success" onclick="mostrarRespuesta({{ mensaje.id }}, '{{ mensaje.telefono_remitente }}')">
+                                        <i class="fas fa-reply"></i> Responder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not mensajes_no_leidos and not mensajes_leidos %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-5x text-muted mb-3"></i>
+                <h4 class="text-muted">No hay mensajes recibidos</h4>
+                <p class="text-muted">Los mensajes de WhatsApp aparecerán aquí cuando lleguen.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para responder -->
+<div class="modal fade" id="modalRespuesta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Responder Mensaje</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form id="formRespuesta" method="POST">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Para:</label>
+                        <input type="text" id="telefonoDestino" class="form-control" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Respuesta:</label>
+                        <textarea name="respuesta" class="form-control" rows="4" placeholder="Escribe tu respuesta aquí..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane"></i> Enviar Respuesta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function marcarLeido(mensajeId) {
+    fetch(`/mensajes-recibidos/${mensajeId}/marcar-leido`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function mostrarRespuesta(mensajeId, telefono) {
+    document.getElementById('telefonoDestino').value = telefono;
+    document.getElementById('formRespuesta').action = `/mensajes-recibidos/${mensajeId}/responder`;
+    $('#modalRespuesta').modal('show');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Zona{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4><i class="fas fa-map-marker-alt"></i> Editar Zona</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre de la Zona:</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" 
+                               value="{{ zona.nombre }}" required>
+                        <div class="form-text">Nombre descriptivo de la zona de reparto</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción:</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" 
+                                  rows="3">{{ zona.descripcion }}</textarea>
+                        <div class="form-text">Descripción opcional de la zona</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('zonas') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Información adicional -->
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h6><i class="fas fa-info-circle"></i> Información de la Zona</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>ID:</strong> {{ zona.id }}</p>
+                        <p><strong>Clientes en esta zona:</strong> {{ zona.clientes|length }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Clientes activos:</strong> 
+                            {{ zona.clientes|selectattr('activo')|list|length }}
+                        </p>
+                        <p><strong>Fecha de creación:</strong> 
+                            {{ zona.created_at.strftime('%d/%m/%Y') if zona.created_at else 'N/A' }}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if zona.clientes %}
+                <hr>
+                <h6>Clientes en esta zona:</h6>
+                <div class="row">
+                    {% for cliente in zona.clientes %}
+                    <div class="col-md-6 mb-2">
+                        <div class="card">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ cliente.nombre }}</strong><br>
+                                        <small class="text-muted">{{ cliente.telefono }}</small>
+                                    </div>
+                                    <div>
+                                        {% if cliente.activo %}
+                                            <span class="badge bg-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Inactivo</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

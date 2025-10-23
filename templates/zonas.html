@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Gestionar Zonas{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-map-marker-alt"></i> Gestionar Zonas</h2>
+            <a href="{{ url_for('panel') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Panel
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-list"></i> Lista de Zonas</h5>
+            </div>
+            <div class="card-body">
+                {% if zonas %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Descripción</th>
+                                <th>Clientes</th>
+                                <th>Clientes Activos</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for zona in zonas %}
+                            <tr>
+                                <td>{{ zona.id }}</td>
+                                <td><strong>{{ zona.nombre }}</strong></td>
+                                <td>{{ zona.descripcion or 'Sin descripción' }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ zona.clientes|length }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">
+                                        {{ zona.clientes|selectattr('activo')|list|length }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('editar_zona', zona_id=zona.id) }}" 
+                                           class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </a>
+                                        <a href="{{ url_for('clientes', zona_id=zona.id) }}" 
+                                           class="btn btn-info btn-sm">
+                                            <i class="fas fa-users"></i> Ver Clientes
+                                        </a>
+                                        {% if zona.clientes|selectattr('activo')|list|length == 0 %}
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="confirmarEliminacion({{ zona.id }}, '{{ zona.nombre }}')">
+                                            <i class="fas fa-trash"></i> Eliminar
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-danger btn-sm" disabled 
+                                                title="No se puede eliminar porque tiene clientes activos">
+                                            <i class="fas fa-trash"></i> Eliminar
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No hay zonas registradas</h5>
+                    <p class="text-muted">Las zonas se crean automáticamente al inicializar el sistema</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que quieres eliminar la zona <strong id="zonaNombre"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmarEliminacion(zonaId, zonaNombre) {
+    document.getElementById('zonaNombre').textContent = zonaNombre;
+    document.getElementById('deleteForm').action = '/zonas/eliminar/' + zonaId;
+    
+    var modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+}
+</script>
+{% endblock %}
+

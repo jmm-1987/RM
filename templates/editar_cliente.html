@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Cliente{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-user-edit"></i> Editar Cliente</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Cliente:</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" 
+                               value="{{ cliente.nombre }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="telefono" class="form-label">Teléfono:</label>
+                        <input type="tel" class="form-control" id="telefono" name="telefono" 
+                               value="{{ cliente.telefono }}" required>
+                        <div class="form-text">Formato: 34625433667 (sin espacios ni guiones)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="zona_id" class="form-label">Zona:</label>
+                        <select class="form-select" id="zona_id" name="zona_id" required>
+                            <option value="">Selecciona una zona</option>
+                            {% for zona in zonas %}
+                            <option value="{{ zona.id }}" 
+                                    {% if zona.id == cliente.zona_id %}selected{% endif %}>
+                                {{ zona.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Información adicional -->
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h6><i class="fas fa-info-circle"></i> Información del Cliente</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>ID:</strong> {{ cliente.id }}</p>
+                        <p><strong>Estado:</strong> 
+                            {% if cliente.activo %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactivo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Zona Actual:</strong> {{ cliente.zona.nombre }}</p>
+                        <p><strong>Descripción Zona:</strong> {{ cliente.zona.descripcion }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
