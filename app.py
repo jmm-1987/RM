@@ -1006,6 +1006,106 @@ def ver_conversacion(mensaje_id):
                          telefono=mensaje.telefono_remitente,
                          nombre=mensaje.nombre_remitente)
 
+# Ruta para polling de mensajes (respaldo al webhook)
+@app.route('/polling-mensajes')
+def polling_mensajes():
+    """Obtener mensajes usando polling como respaldo al webhook"""
+    try:
+        import requests
+        
+        # Configuración de Green-API
+        if os.environ.get('RENDER'):
+            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID
+        else:
+            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID
+        
+        # URL para obtener mensajes
+        url = f"{GREEN_API_URL}/waInstance{GREEN_API_INSTANCE_ID}/receiveNotification/{GREEN_API_TOKEN}"
+        
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data and 'body' in data:
+                mensaje_data = data['body']
+                
+                if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
+                    # Procesar el mensaje igual que en el webhook
+                    message_data = mensaje_data.get('messageData', {})
+                    sender_data = mensaje_data.get('senderData', {})
+                    
+                    # Obtener número de teléfono del remitente
+                    telefono_remitente = sender_data.get('sender', '').replace('@c.us', '')
+                    
+                    # Obtener el mensaje
+                    mensaje_texto = ''
+                    tipo_mensaje = 'texto'
+                    archivo_url = None
+                    
+                    if 'textMessageData' in message_data:
+                        mensaje_texto = message_data['textMessageData'].get('textMessage', '')
+                        tipo_mensaje = 'texto'
+                    elif 'extendedTextMessageData' in message_data:
+                        mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
+                        tipo_mensaje = 'texto'
+                    elif 'imageMessageData' in message_data:
+                        mensaje_texto = message_data['imageMessageData'].get('caption', '')
+                        tipo_mensaje = 'imagen'
+                        archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
+                    elif 'documentMessageData' in message_data:
+                        mensaje_texto = message_data['documentMessageData'].get('caption', '')
+                        tipo_mensaje = 'documento'
+                        archivo_url = message_data['documentMessageData'].get('downloadUrl', '')
+                    elif 'audioMessageData' in message_data:
+                        mensaje_texto = '[Mensaje de audio]'
+                        tipo_mensaje = 'audio'
+                        archivo_url = message_data['audioMessageData'].get('downloadUrl', '')
+                    elif 'videoMessageData' in message_data:
+                        mensaje_texto = message_data['videoMessageData'].get('caption', '')
+                        tipo_mensaje = 'video'
+                        archivo_url = message_data['videoMessageData'].get('downloadUrl', '')
+                    
+                    # Buscar si el remitente es un cliente existente
+                    cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
+                    
+                    # Crear registro del mensaje recibido
+                    mensaje_recibido = MensajeRecibido(
+                        telefono_remitente=telefono_remitente,
+                        nombre_remitente=sender_data.get('senderName', ''),
+                        mensaje=mensaje_texto,
+                        tipo_mensaje=tipo_mensaje,
+                        archivo_url=archivo_url,
+                        cliente_id=cliente_existente.id if cliente_existente else None,
+                        id_mensaje_whatsapp=mensaje_data.get('idMessage', '')
+                    )
+                    
+                    db.session.add(mensaje_recibido)
+                    db.session.commit()
+                    
+                    print(f"✅ Mensaje recibido por polling de {telefono_remitente}: {mensaje_texto[:50]}...")
+                    
+                    return jsonify({'status': 'success', 'message': 'Message processed via polling'})
+                else:
+                    return jsonify({'status': 'ignored', 'message': f'Not an incoming message: {mensaje_data.get("typeWebhook")}'})
+            else:
+                return jsonify({'status': 'no_messages', 'message': 'No messages in queue'})
+                
+        elif response.status_code == 404:
+            return jsonify({'status': 'no_messages', 'message': 'No messages in queue'})
+        else:
+            return jsonify({'status': 'error', 'message': f'HTTP {response.status_code}'})
+            
+    except Exception as e:
+        print(f"❌ Error en polling: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# Ruta para activar polling automático
+@app.route('/activar-polling')
+def activar_polling():
+    """Página para activar el polling automático"""
+    return render_template('activar_polling.html')
+
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""
     try:
