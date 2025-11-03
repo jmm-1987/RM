@@ -124,3 +124,22 @@ class RespuestaMensaje(db.Model):
     
     def __repr__(self):
         return f'<RespuestaMensaje {self.id}>'
+
+
+class ProgramacionMasiva(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    zona_id = db.Column(db.Integer, db.ForeignKey('zona.id'), nullable=False)
+    plantilla_id = db.Column(db.Integer, db.ForeignKey('mensaje_plantilla.id'), nullable=False)
+    # Días de la semana como números separados por coma: 0=Lunes ... 6=Domingo
+    dias_semana = db.Column(db.String(20), nullable=False)
+    # Hora en formato HH:MM (24h)
+    hora = db.Column(db.String(5), nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    ultima_ejecucion = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    zona = db.relationship('Zona', backref='programaciones_masivas')
+    plantilla = db.relationship('MensajePlantilla', backref='programaciones_masivas')
+
+    def __repr__(self):
+        return f'<ProgramacionMasiva zona={self.zona_id} hora={self.hora} dias={self.dias_semana}>'

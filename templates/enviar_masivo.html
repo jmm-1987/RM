@@ -85,35 +85,21 @@
                         </div>
                     </div>
                     
-                    <!-- Información sobre variables disponibles -->
-                    <div class="row mt-3">
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <h6><i class="fas fa-info-circle"></i> Variables Disponibles en los Mensajes:</h6>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <ul class="mb-0">
-                                            <li><code>{nombre_cliente}</code> - Nombre del cliente</li>
-                                            <li><code>{zona}</code> - Nombre de la zona</li>
-                                        </ul>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <ul class="mb-0">
-                                            <li><code>{enlace_web}</code> - Enlace a ofertas públicas</li>
-                                            <li><strong>🌐</strong> El enlace web se genera automáticamente</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="row">
                         <div class="col-12">
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle"></i>
                                 <strong>Advertencia:</strong> Esta acción enviará mensajes solo a los destinatarios seleccionados de la zona elegida. 
                                 Revisa la lista de destinatarios antes de continuar.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Nota:</strong> Para programar envíos automáticos por zona, días y hora, ve a <a href="{{ url_for('programaciones') }}" class="alert-link">Programaciones de Envío</a>.
                             </div>
                         </div>
                     </div>
@@ -134,53 +120,6 @@
                         </div>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-map"></i> Zonas Disponibles</h5>
-            </div>
-            <div class="card-body">
-                {% if zonas %}
-                    <ul class="list-group list-group-flush">
-                        {% for zona in zonas %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ zona.nombre }}
-                            <span class="badge bg-primary rounded-pill">{{ zona.clientes|length }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted">No hay zonas configuradas.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-comment"></i> Plantillas Disponibles</h5>
-            </div>
-            <div class="card-body">
-                {% if plantillas %}
-                    <ul class="list-group list-group-flush">
-                        {% for plantilla in plantillas %}
-                        <li class="list-group-item">
-                            <strong>{{ plantilla.nombre }}</strong>
-                            <br>
-                            <small class="text-muted">{{ plantilla.contenido[:50] }}...</small>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted">No hay plantillas configuradas.</p>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -288,6 +227,7 @@ function mostrarVistaPrevia() {
         document.getElementById('vista-previa-section').style.display = 'none';
     }
 }
+
 </script>
 
 {% endblock %}

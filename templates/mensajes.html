@@ -24,7 +24,7 @@
                             <h6 class="card-title">{{ plantilla.nombre }}</h6>
                             <p class="card-text">{{ plantilla.contenido }}</p>
                             <small class="text-muted">
-                                Variables disponibles: {nombre_cliente}, {zona}
+                                Variables disponibles: {nombre_cliente}, {zona}, {enlace_web}
                             </small>
                         </div>
                     </div>
@@ -48,11 +48,21 @@
             </div>
             <div class="card-body">
                 <p>Las plantillas de mensajes pueden incluir las siguientes variables que se reemplazarán automáticamente:</p>
-                <ul>
-                    <li><code>{nombre_cliente}</code> - Se reemplaza con el nombre del cliente</li>
-                    <li><code>{zona}</code> - Se reemplaza con el nombre de la zona</li>
-                </ul>
-                <p class="text-muted">Ejemplo: "Hola {nombre_cliente}, vamos a pasar por la zona {zona}..."</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul>
+                            <li><code>{nombre_cliente}</code> - Se reemplaza con el nombre del cliente</li>
+                            <li><code>{zona}</code> - Se reemplaza con el nombre de la zona</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul>
+                            <li><code>{enlace_web}</code> - Enlace a ofertas públicas</li>
+                            <li><strong>🌐</strong> El enlace web se genera automáticamente</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-muted mt-3">Ejemplo: "Hola {nombre_cliente}, vamos a pasar por la zona {zona}... Consulta nuestras ofertas: {enlace_web}"</p>
             </div>
         </div>
     </div>

@@ -4,9 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recambios RM - Distribución de Recambios</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        * {
+            font-family: 'Poppins', 'Montserrat', sans-serif;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .navbar-brand {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+        }
         body {
             background: #000000;
             color: white;
@@ -105,8 +122,60 @@
         }
         
         @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
+            0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+            25% { transform: translateY(-15px) rotate(90deg) scale(1.05); }
+            50% { transform: translateY(-30px) rotate(180deg) scale(1.1); }
+            75% { transform: translateY(-15px) rotate(270deg) scale(1.05); }
+        }
+        
+        .shape {
+            animation: float 8s ease-in-out infinite;
+        }
+        
+        /* Efecto de partículas */
+        .particle {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFloat 15s linear infinite;
+        }
+        
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) translateX(100px);
+                opacity: 0;
+            }
+        }
+        
+        /* Mejoras en el título del hero */
+        .hero-content h1 {
+            background: linear-gradient(135deg, #fff, #a8e6cf, #ffd3a5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
         }
         
         .hero-section {
@@ -123,40 +192,153 @@
             justify-content: center;
         }
         .oferta-card {
-            transition: transform 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             border: none;
             box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0;
+            animation: fadeInUp 0.6s ease forwards;
+            position: relative;
+            overflow: hidden;
+            min-height: 380px; /* altura general */
         }
+
+        
+.oferta-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Ajuste para pantallas pequeñas */
+        @media (max-width: 576px) {
+            .oferta-card {
+                min-height: auto;
+            }
+        }
+        
+.oferta-card:hover::after {
+            opacity: 1;
+        }
+        
+        .oferta-card:nth-child(1) { animation-delay: 0.1s; }
+        .oferta-card:nth-child(2) { animation-delay: 0.2s; }
+        .oferta-card:nth-child(3) { animation-delay: 0.3s; }
+        .oferta-card:nth-child(4) { animation-delay: 0.4s; }
+        
         .oferta-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 15px rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(255, 255, 255, 0.3), 0 0 20px rgba(0, 150, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(0, 150, 255, 0.5);
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
         }
         .precio {
             font-size: 1.5rem;
             font-weight: bold;
             color: #28a745;
-        }
-        .destacada {
-            border: 3px solid #ffc107;
             position: relative;
+            display: inline-block;
+            animation: priceGlow 2s ease-in-out infinite;
         }
-        .destacada::before {
-            content: "⭐ DESTACADA";
+        
+        @keyframes priceGlow {
+            0%, 100% {
+                text-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
+            }
+            50% {
+                text-shadow: 0 0 15px rgba(40, 167, 69, 0.8), 0 0 25px rgba(40, 167, 69, 0.6);
+            }
+        }
+        
+        .btn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn::before {
+            content: '';
             position: absolute;
-            top: -15px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            background: #ffc107;
-            color: #000;
-            padding: 5px 15px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            z-index: 1;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            border: none;
+        }
+        
+        .btn-success:hover {
+            background: linear-gradient(135deg, #128C7E, #25D366);
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #764ba2, #667eea);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Animaciones de scroll */
+        .fade-in-scroll {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s ease;
+        }
+        
+        .fade-in-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
         }
         .navbar-brand {
             font-weight: bold;
@@ -170,14 +352,84 @@
         }
         .hero-logo {
             filter: drop-shadow(0 8px 16px rgba(255,255,255,0.3));
-            transition: transform 0.3s ease, filter 0.3s ease, opacity 0.8s ease;
-            animation: logoEntrance 2s ease-out forwards;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: logoEntrance 2s ease-out forwards, logoFloat 3s ease-in-out infinite 2s;
             opacity: 0;
             transform: translateY(50px) scale(0.8);
+            margin-top: -80px;
+        }
+        
+        .license-plate {
+            display: block;
+            background: white;
+            border: 4px solid #000;
+            border-radius: 8px;
+            padding: 15px 25px;
+            margin-top: 80px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .license-plate:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .license-plate::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 60px;
+            height: 100%;
+            background: linear-gradient(135deg, #003399 0%, #0066CC 100%);
+            border-right: 3px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .license-plate::after {
+            content: '⭐';
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #FFD700;
+            font-size: 24px;
+            z-index: 1;
+        }
+        
+        .license-plate-content {
+            margin-left: 65px;
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #000;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: block;
+            padding-right: 15px;
+        }
+        
+        .license-plate:hover .license-plate-content {
+            color: #0066CC;
         }
         .hero-logo:hover {
-            transform: scale(1.1);
-            filter: drop-shadow(0 12px 24px rgba(255,255,255,0.5));
+            transform: scale(1.15) rotate(2deg);
+            filter: drop-shadow(0 15px 30px rgba(255,255,255,0.6));
+            animation-play-state: paused;
+        }
+        
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.02); }
         }
         .oferta-card .card-img-top {
             aspect-ratio: 1;
@@ -201,6 +453,19 @@
         
         .card-body {
             color: white;
+        }
+
+        /* Mejorar contraste en bloque de "¿Interesado?" */
+        #trabaja-con-nosotros .card {
+            background: #ffffff;
+            color: #212529;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        #trabaja-con-nosotros .card .card-body,
+        #trabaja-con-nosotros .card .card-title,
+        #trabaja-con-nosotros .card .card-text,
+        #trabaja-con-nosotros .text-muted {
+            color: #212529 !important;
         }
         
         .text-muted {
@@ -278,39 +543,22 @@
         .brands-container {
             display: flex;
             animation: scroll 30s linear infinite;
-            width: calc(200px * 12); /* Ancho total basado en número de logos */
+            width: calc(200px * 16); /* Ancho total basado en número de logos */
         }
         
-        .brand-logo {
+        .brands-container img {
             flex: 0 0 200px;
             height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .brand-logo:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.15);
-        }
-        
-        .brand-logo img {
-            max-height: 60px;
             max-width: 150px;
-            filter: brightness(0) invert(1);
-            opacity: 0.8;
-            transition: opacity 0.3s ease;
+            object-fit: contain;
+            margin: 0 20px;
+            opacity: 0.9;
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         
-        .brand-logo:hover img {
+        .brands-container img:hover {
             opacity: 1;
+            transform: scale(1.05);
         }
         
         @keyframes scroll {
@@ -395,105 +643,13 @@
             <div class="row justify-content-center align-items-center min-vh-100">
                 <div class="col-12 hero-content">
                     <img src="{{ url_for('static', filename='logo_rm.png') }}" alt="Recambios RM" class="img-fluid hero-logo" style="max-height: 200px;">
-                    <div class="mt-4">
-                        <h1 class="display-4 fw-bold mb-3">Recambios RM</h1>
-                        <p class="lead fs-4">Tu distribuidor de confianza para recambios de automoción</p>
-                        <div class="mt-4">
-                            <a href="{{ url_for('ofertas_publicas') }}" class="btn btn-primary btn-lg me-3">
-                                <i class="fas fa-tags"></i> Ver Ofertas
-                            </a>
-                            <a href="#trabaja-con-nosotros" class="btn btn-outline-light btn-lg">
-                                <i class="fas fa-users"></i> Trabaja con Nosotros
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Ofertas Destacadas -->
-    {% if ofertas_destacadas %}
-    <section class="py-5 section-dark">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <h2 class="text-center mb-5">
-                        <i class="fas fa-star text-warning"></i> Ofertas Destacadas
-                    </h2>
-                </div>
-            </div>
-            <div class="row">
-                {% for oferta in ofertas_destacadas %}
-                <div class="col-md-4 mb-4">
-                    <div class="card oferta-card destacada h-100">
-                        {% if oferta.imagen %}
-                        <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="card-img-top" style="height: 250px; width: 100%; object-fit: contain; background-color: #f8f9fa;" alt="{{ oferta.titulo }}">
-                        {% else %}
-                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 250px; width: 100%;">
-                            <i class="fas fa-image fa-4x text-muted"></i>
-                        </div>
-                        {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title">{{ oferta.titulo }}</h5>
-                            <p class="card-text">{{ oferta.descripcion[:120] }}{% if oferta.descripcion|length > 120 %}...{% endif %}</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="precio">€{{ "%.2f"|format(oferta.precio) }}</span>
-                                <small class="text-muted">{{ oferta.created_at.strftime('%d/%m/%Y') }}</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </section>
-    {% endif %}
-
-    <!-- Ofertas Normales -->
-    {% if ofertas_normales %}
-    <section class="py-5 section-dark">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <h2 class="text-center mb-5">
-                        <i class="fas fa-tags"></i> Más Ofertas
-                    </h2>
-                </div>
-            </div>
-            <div class="row">
-                {% for oferta in ofertas_normales %}
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <div class="card oferta-card h-100">
-                        {% if oferta.imagen %}
-                        <img src="{{ url_for('uploaded_file', filename=oferta.imagen) }}" class="card-img-top" style="height: 200px; width: 100%; object-fit: contain; background-color: #f8f9fa;" alt="{{ oferta.titulo }}">
-                        {% else %}
-                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px; width: 100%;">
-                            <i class="fas fa-image fa-3x text-muted"></i>
-                        </div>
-                        {% endif %}
-                        <div class="card-body">
-                            <h6 class="card-title">{{ oferta.titulo }}</h6>
-                            <p class="card-text">{{ oferta.descripcion[:80] }}{% if oferta.descripcion|length > 80 %}...{% endif %}</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="precio">€{{ "%.2f"|format(oferta.precio) }}</span>
-                                <small class="text-muted">{{ oferta.created_at.strftime('%d/%m') }}</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            <div class="row">
-                <div class="col-12 text-center">
-                    <a href="{{ url_for('ofertas_publicas') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-eye"></i> Ver Todas las Ofertas
+                    <a href="{{ url_for('ofertas_publicas') }}" class="license-plate">
+                        <span class="license-plate-content">OFERTAS</span>
                     </a>
                 </div>
             </div>
         </div>
     </section>
-    {% endif %}
 
     <!-- Información de la Empresa -->
     <section class="py-5 section-dark">
@@ -533,73 +689,23 @@
             </div>
             <div class="brands-container">
                 <!-- Primera fila de logos -->
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwN0JGRiIvPgo8Y2lyY2xlIGN4PSIxMDAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNGRjAwMDAiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkJPU0NIPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Bosch">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TUFOTjwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Mann">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1BR05FVEk8L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Magnet">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNBTElDPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Salic">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZBTEVPPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Valeo">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklMVE88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Filtro">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Qk1XPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="BMW">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1FUkNFREVTPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Mercedes">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QVVESS88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Audi">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZPTEtTV0FHRU48L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Volkswagen">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklBVDwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Fiat">
-                </div>
+                <img src="{{ url_for('static', filename='castrol.png') }}" alt="Castrol">
+                <img src="{{ url_for('static', filename='John_Deere.png') }}" alt="John Deere">
+                <img src="{{ url_for('static', filename='Liqui-moly.svg') }}" alt="Liqui Moly">
+                <img src="{{ url_for('static', filename='mann.png') }}" alt="Mann">
+                <img src="{{ url_for('static', filename='motul.png') }}" alt="Motul">
+                <img src="{{ url_for('static', filename='MARCAJBM.png') }}" alt="JBM">
+                <img src="{{ url_for('static', filename='recalvi.png') }}" alt="Recalvi">
+                <img src="{{ url_for('static', filename='TUDOR-BATTERIES-1024x339.webp') }}" alt="Tudor Batteries">
                 <!-- Segunda fila de logos (duplicados para el efecto infinito) -->
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwN0JGRiIvPgo8Y2lyY2xlIGN4PSIxMDAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNGRjAwMDAiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkJPU0NIPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Bosch">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TUFOTjwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Mann">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1BR05FVEk8L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Magnet">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNBTElDPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Salic">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZBTEVPPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Valeo">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklMVE88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Filtro">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Qk1XPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="BMW">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzAwMDAwMCIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1FUkNFREVTPC90ZXh0Pgo8L3N2Zz4KPC9zdmc+" alt="Mercedes">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY2MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEw1MCAxMEw1MCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI2MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI0ZGNjAwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QVVESS88L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Audi">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4MDAwIi8+CjxwYXRoIGQ9Ik0xMCAxMEwzMCAxMEwzMCAzMEwxMCAzMFoiIGZpbGw9IiNGRkZGRkYiLz4KPHN2ZyB4PSI0MCIgeT0iMTAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyMCI+Cjx0ZXh0IHg9IjIwIiB5PSIxNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZPTEtTV0FHRU48L3RleHQ+Cjwvc3ZnPgo8L3N2Zz4=" alt="Volkswagen">
-                </div>
-                <div class="brand-logo">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTIwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjMiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRkZGRiIvPgo8c3ZnIHg9IjQwIiB5PSIxMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjIwIj4KPHRleHQgeD0iMjAiIHk9IjE1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RklBVDwvdGV4dD4KPC9zdmc+Cjwvc3ZnPg==" alt="Fiat">
-                </div>
+                <img src="{{ url_for('static', filename='castrol.png') }}" alt="Castrol">
+                <img src="{{ url_for('static', filename='John_Deere.png') }}" alt="John Deere">
+                <img src="{{ url_for('static', filename='Liqui-moly.svg') }}" alt="Liqui Moly">
+                <img src="{{ url_for('static', filename='mann.png') }}" alt="Mann">
+                <img src="{{ url_for('static', filename='motul.png') }}" alt="Motul">
+                <img src="{{ url_for('static', filename='MARCAJBM.png') }}" alt="JBM">
+                <img src="{{ url_for('static', filename='recalvi.png') }}" alt="Recalvi">
+                <img src="{{ url_for('static', filename='TUDOR-BATTERIES-1024x339.webp') }}" alt="Tudor Batteries">
             </div>
         </div>
     </section>
@@ -787,5 +893,101 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function whatsappPedido(titulo) {
+            const telefono = '34605360115'; // +34 605360115
+            const mensaje = `Hola, estoy interesado en la oferta: ${titulo}. ¿Me podéis confirmar disponibilidad y cómo pedirla?`;
+            const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
+        }
+        
+        // Animaciones de scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+        
+        // Observar elementos con animación de scroll
+        document.querySelectorAll('.section-dark, .card, .brand-logo').forEach(el => {
+            el.classList.add('fade-in-scroll');
+            observer.observe(el);
+        });
+        
+        // Crear partículas flotantes
+        function createParticles() {
+            const particleCount = 20;
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                document.body.appendChild(particle);
+            }
+        }
+        
+        // Inicializar partículas al cargar
+        window.addEventListener('load', () => {
+            createParticles();
+        });
+        
+        // Efecto parallax suave en el scroll
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.hero-section');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.5}px)`;
+            }
+            
+            // Animación de navbar al hacer scroll
+            const navbar = document.querySelector('.navbar');
+            if (scrolled > 100) {
+                navbar.style.background = 'rgba(0, 0, 0, 0.95)';
+                navbar.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.3)';
+            } else {
+                navbar.style.background = '';
+                navbar.style.boxShadow = '';
+            }
+            
+            lastScroll = scrolled;
+        });
+        
+        // Agregar efecto de typing al título principal
+        function typeWriter(element, text, speed = 100) {
+            let i = 0;
+            element.innerHTML = '';
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+        
+        // Smooth scroll para los enlaces del navbar
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>

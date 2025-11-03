@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
-from models import db, Zona, Cliente, MensajePlantilla, MensajeEnviado, Oferta, MensajeOferta, MensajeRecibido, RespuestaMensaje
+from models import db, Zona, Cliente, MensajePlantilla, MensajeEnviado, Oferta, MensajeOferta, MensajeRecibido, RespuestaMensaje, ProgramacionMasiva
 from whatsapp_sender import enviar_whatsapp, configurar_green_api, green_api_sender
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 import os
+import threading
+import time as _time
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -33,6 +35,91 @@ db.init_app(app)
 
 # Variable para controlar la inicialización
 _sistema_inicializado = False
+_scheduler_iniciado = False
+
+
+def _ejecutor_programaciones():
+    """Hilo en background que ejecuta envíos masivos programados por zona y hora."""
+    with app.app_context():
+        while True:
+            ahora = datetime.now()
+            dia_semana = ahora.weekday()  # 0=Lunes ... 6=Domingo
+            hora_actual = ahora.strftime('%H:%M')
+
+            try:
+                programaciones = ProgramacionMasiva.query.filter_by(activo=True).all()
+                for prog in programaciones:
+                    # Verificar día
+                    dias = {int(d) for d in prog.dias_semana.split(',') if d.strip()}
+                    if dia_semana not in dias:
+                        continue
+
+                    # Verificar hora exacta (minuto)
+                    if prog.hora != hora_actual:
+                        continue
+
+                    # Evitar ejecutar más de una vez por día
+                    if prog.ultima_ejecucion == date.today():
+                        continue
+
+                    # Ejecutar envío para la zona
+                    zona = Zona.query.get(prog.zona_id)
+                    plantilla = MensajePlantilla.query.get(prog.plantilla_id)
+                    if not zona or not plantilla:
+                        continue
+
+                    clientes = Cliente.query.filter(
+                        Cliente.zona_id == prog.zona_id,
+                        Cliente.activo == True
+                    ).all()
+
+                    for cliente in clientes:
+                        enlace_web = generar_enlace_web()
+                        mensaje_personalizado = plantilla.contenido.format(
+                            nombre_cliente=cliente.nombre,
+                            zona=zona.nombre,
+                            enlace_web=enlace_web
+                        )
+
+                        success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
+
+                        registro = MensajeEnviado(
+                            cliente_id=cliente.id,
+                            plantilla_id=plantilla.id,
+                            mensaje_final=mensaje_personalizado,
+                            enviado=success,
+                            fecha_envio=datetime.now(timezone.utc) if success else None,
+                            error=error_msg if not success else None
+                        )
+                        db.session.add(registro)
+
+                    # Marcar ejecución del día y confirmar
+                    prog.ultima_ejecucion = date.today()
+                    db.session.commit()
+
+            except Exception as e:
+                # Evitar que el hilo muera por excepciones
+                print(f"❌ Error en ejecutor de programaciones: {e}")
+
+            # Dormir hasta el siguiente minuto
+            _time.sleep(30)
+
+
+def _iniciar_hilo_programaciones():
+    hilo = threading.Thread(target=_ejecutor_programaciones, name='ejecutor_programaciones', daemon=True)
+    hilo.start()
+
+
+@app.before_request
+def _asegurar_scheduler():
+    global _scheduler_iniciado
+    if not _scheduler_iniciado:
+        try:
+            _iniciar_hilo_programaciones()
+            _scheduler_iniciado = True
+            print("⏰ Scheduler de programaciones iniciado")
+        except Exception as e:
+            print(f"❌ No se pudo iniciar el scheduler: {e}")
 
 def migrar_sqlite_a_postgres():
     """Migrga datos de SQLite local a PostgreSQL en producción"""
@@ -394,7 +481,7 @@ def enviar_masivo():
         if not zona_id or not plantilla_id:
             flash('Debe seleccionar una zona y una plantilla de mensaje', 'error')
             return redirect(url_for('enviar_masivo'))
-        
+
         if not destinatarios_seleccionados:
             flash('Debe seleccionar al menos un destinatario', 'error')
             return redirect(url_for('enviar_masivo'))
@@ -477,6 +564,110 @@ def api_clientes_zona(zona_id):
         'nombre': c.nombre,
         'telefono': c.telefono
     } for c in clientes])
+
+# Rutas para gestión de programaciones
+@app.route('/programaciones')
+def programaciones():
+    programaciones_list = ProgramacionMasiva.query.order_by(ProgramacionMasiva.created_at.desc()).all()
+    zonas = Zona.query.all()
+    plantillas = MensajePlantilla.query.filter_by(activo=True).all()
+    return render_template('programaciones.html', 
+                         programaciones=programaciones_list,
+                         zonas=zonas,
+                         plantillas=plantillas)
+
+@app.route('/programaciones/nueva', methods=['POST'])
+def nueva_programacion():
+    zona_id = request.form.get('zona_id')
+    plantilla_id = request.form.get('plantilla_id')
+    dias_semana = request.form.getlist('dias_semana')
+    hora = request.form.get('hora')
+    
+    if not zona_id or not plantilla_id or not dias_semana or not hora:
+        flash('Todos los campos son obligatorios', 'error')
+        return redirect(url_for('programaciones'))
+    
+    try:
+        dias_normalizados = sorted({str(int(d)) for d in dias_semana if d.strip()})
+        programacion = ProgramacionMasiva(
+            zona_id=int(zona_id),
+            plantilla_id=int(plantilla_id),
+            dias_semana=','.join(dias_normalizados),
+            hora=hora,
+            activo=True
+        )
+        db.session.add(programacion)
+        db.session.commit()
+        flash('Programación creada correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creando la programación: {str(e)}', 'error')
+    
+    return redirect(url_for('programaciones'))
+
+@app.route('/programaciones/<int:id>/editar', methods=['GET', 'POST'])
+def editar_programacion(id):
+    programacion = ProgramacionMasiva.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        zona_id = request.form.get('zona_id')
+        plantilla_id = request.form.get('plantilla_id')
+        dias_semana = request.form.getlist('dias_semana')
+        hora = request.form.get('hora')
+        
+        if not zona_id or not plantilla_id or not dias_semana or not hora:
+            flash('Todos los campos son obligatorios', 'error')
+            return redirect(url_for('editar_programacion', id=id))
+        
+        try:
+            dias_normalizados = sorted({str(int(d)) for d in dias_semana if d.strip()})
+            programacion.zona_id = int(zona_id)
+            programacion.plantilla_id = int(plantilla_id)
+            programacion.dias_semana = ','.join(dias_normalizados)
+            programacion.hora = hora
+            db.session.commit()
+            flash('Programación actualizada correctamente', 'success')
+            return redirect(url_for('programaciones'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error actualizando la programación: {str(e)}', 'error')
+    
+    zonas = Zona.query.all()
+    plantillas = MensajePlantilla.query.filter_by(activo=True).all()
+    dias_seleccionados = [int(d) for d in programacion.dias_semana.split(',') if d.strip()]
+    
+    return render_template('editar_programacion.html',
+                         programacion=programacion,
+                         zonas=zonas,
+                         plantillas=plantillas,
+                         dias_seleccionados=dias_seleccionados)
+
+@app.route('/programaciones/<int:id>/eliminar', methods=['POST'])
+def eliminar_programacion(id):
+    programacion = ProgramacionMasiva.query.get_or_404(id)
+    try:
+        db.session.delete(programacion)
+        db.session.commit()
+        flash('Programación eliminada correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error eliminando la programación: {str(e)}', 'error')
+    
+    return redirect(url_for('programaciones'))
+
+@app.route('/programaciones/<int:id>/toggle', methods=['POST'])
+def toggle_programacion(id):
+    programacion = ProgramacionMasiva.query.get_or_404(id)
+    programacion.activo = not programacion.activo
+    try:
+        db.session.commit()
+        estado = 'activada' if programacion.activo else 'desactivada'
+        flash(f'Programación {estado} correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error cambiando el estado: {str(e)}', 'error')
+    
+    return redirect(url_for('programaciones'))
 
 # Rutas para gestión de ofertas
 @app.route('/ofertas')

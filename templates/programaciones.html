@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Programaciones de Envío{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-clock"></i> Programaciones de Envío Masivo</h2>
+        <hr>
+    </div>
+</div>
+
+<!-- Formulario para crear nueva programación -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="fas fa-plus-circle"></i> Nueva Programación</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('nueva_programacion') }}">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="zona_id" class="form-label">Zona:</label>
+                            <select name="zona_id" id="zona_id" class="form-select" required>
+                                <option value="">Seleccione una zona</option>
+                                {% for zona in zonas %}
+                                <option value="{{ zona.id }}">{{ zona.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="plantilla_id" class="form-label">Plantilla de Mensaje:</label>
+                            <select name="plantilla_id" id="plantilla_id" class="form-select" required>
+                                <option value="">Seleccione una plantilla</option>
+                                {% for plantilla in plantillas %}
+                                <option value="{{ plantilla.id }}">{{ plantilla.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="hora" class="form-label">Hora (24h):</label>
+                            <input type="time" class="form-control" id="hora" name="hora" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Días de la semana:</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_0" value="0">
+                                    <label class="form-check-label" for="dia_0">Lunes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_1" value="1">
+                                    <label class="form-check-label" for="dia_1">Martes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_2" value="2">
+                                    <label class="form-check-label" for="dia_2">Miércoles</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_3" value="3">
+                                    <label class="form-check-label" for="dia_3">Jueves</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_4" value="4">
+                                    <label class="form-check-label" for="dia_4">Viernes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_5" value="5">
+                                    <label class="form-check-label" for="dia_5">Sábado</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="dias_semana" id="dia_6" value="6">
+                                    <label class="form-check-label" for="dia_6">Domingo</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Crear Programación
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de programaciones existentes -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Programaciones Existentes</h5>
+            </div>
+            <div class="card-body">
+                {% if programaciones %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Zona</th>
+                                <th>Plantilla</th>
+                                <th>Días</th>
+                                <th>Hora</th>
+                                <th>Estado</th>
+                                <th>Última Ejecución</th>
+                                <th>Creada</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prog in programaciones %}
+                            <tr>
+                                <td>{{ prog.zona.nombre }}</td>
+                                <td>{{ prog.plantilla.nombre }}</td>
+                                <td>
+                                    {% set dias_nombres = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] %}
+                                    {% set dias_seleccionados = prog.dias_semana.split(',') %}
+                                    {% for dia in dias_seleccionados %}
+                                        {% set dia_idx = (dia | trim | int) %}
+                                        {% if (dia | trim) != '' and 0 <= dia_idx <= 6 %}
+                                            {{ dias_nombres[dia_idx] }}{% if not loop.last %}, {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td><strong>{{ prog.hora }}</strong></td>
+                                <td>
+                                    {% if prog.activo %}
+                                        <span class="badge bg-success">Activa</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactiva</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if prog.ultima_ejecucion %}
+                                        {{ prog.ultima_ejecucion.strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                        <span class="text-muted">Nunca</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ prog.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('editar_programacion', id=prog.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </a>
+                                        <form method="POST" action="{{ url_for('toggle_programacion', id=prog.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if prog.activo else 'success' }}">
+                                                <i class="fas fa-{{ 'pause' if prog.activo else 'play' }}"></i>
+                                                {{ 'Desactivar' if prog.activo else 'Activar' }}
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('eliminar_programacion', id=prog.id) }}" style="display: inline;" 
+                                              onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta programación?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i> Eliminar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> No hay programaciones creadas. Crea una nueva arriba.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
