@@ -13,10 +13,20 @@ def prueba_envio_real():
         print("Configurando Green-API para envío real...")
         
         try:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
+            from green_api_config import (
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             # Configurar Green-API
-            conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+            conectado, mensaje = configurar_green_api(
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             if conectado:
                 print(f"Green-API conectado: {mensaje}")
@@ -29,7 +39,7 @@ def prueba_envio_real():
                     print("Haciendo prueba de envío real...")
                     
                     # Número de prueba (puedes cambiarlo por el tuyo)
-                    numero_prueba = "34625433667"  # Tu número de la instancia
+                    numero_prueba = GREEN_API_PHONE or "34625433667"  # Tu número de la instancia
                     mensaje_prueba = "Prueba de envío REAL desde Recambios RM - Sistema funcionando correctamente"
                     
                     print(f"Enviando mensaje a {numero_prueba}...")
@@ -51,6 +61,8 @@ def prueba_envio_real():
 
 if __name__ == '__main__':
     prueba_envio_real()
+
+
 
 
 

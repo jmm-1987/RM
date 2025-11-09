@@ -21,15 +21,29 @@
                     <div class="mb-3">
                         <label for="api_url" class="form-label">URL de la API:</label>
                         <input type="url" class="form-control" id="api_url" name="api_url" 
-                               placeholder="https://7107.api.green-api.com" required>
+                               placeholder="https://7107.api.green-api.com" value="{{ config.url }}" required>
                         <div class="form-text">URL completa de tu instancia de Green-API</div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="api_token" class="form-label">Token de Autenticación:</label>
                         <input type="password" class="form-control" id="api_token" name="api_token" 
-                               placeholder="Tu token de Green-API" required>
+                               placeholder="Tu token de Green-API" value="{{ config.token }}" required>
                         <div class="form-text">Token de autenticación de tu instancia</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="instance_id" class="form-label">ID de Instancia:</label>
+                        <input type="text" class="form-control" id="instance_id" name="instance_id" 
+                               placeholder="Ej: 7107349111" value="{{ config.instance_id }}" required>
+                        <div class="form-text">Identificador numérico de tu instancia de Green-API</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Teléfono de la Instancia:</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" 
+                               placeholder="Ej: 34625433667" value="{{ config.phone }}" required>
+                        <div class="form-text">Número de WhatsApp asociado a la instancia (incluye código de país)</div>
                     </div>
                     
                     <div class="alert alert-info">

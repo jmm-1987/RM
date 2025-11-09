@@ -13,14 +13,24 @@ def configurar_y_probar():
         print("=== CONFIGURANDO GREEN-API PARA ENVÍOS REALES ===")
         
         try:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
+            from green_api_config import (
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             print(f"URL: {GREEN_API_URL}")
             print(f"Token: {GREEN_API_TOKEN[:10]}...")
             
             # Configurar Green-API
             print("Configurando Green-API...")
-            conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+            conectado, mensaje = configurar_green_api(
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             if conectado:
                 print(f"Green-API configurado: {mensaje}")
@@ -32,7 +42,7 @@ def configurar_y_probar():
                     print("MODO REAL ACTIVADO - Los envíos serán reales")
                     
                     # Hacer prueba de envío
-                    numero_prueba = "34625433667"
+                    numero_prueba = GREEN_API_PHONE or "34625433667"
                     mensaje_prueba = "PRUEBA REAL - Sistema Recambios RM funcionando correctamente"
                     
                     print(f"Enviando mensaje REAL a {numero_prueba}...")

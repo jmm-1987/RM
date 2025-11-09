@@ -13,7 +13,12 @@ def verificar_configuracion():
         print("=== VERIFICACIÓN DE CONFIGURACIÓN GREEN-API ===")
         
         try:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
+            from green_api_config import (
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             print(f"1. Datos de configuración:")
             print(f"   URL: {GREEN_API_URL}")
@@ -25,7 +30,12 @@ def verificar_configuracion():
             print(f"   API Token: {green_api_sender.api_token}")
             
             print(f"\n3. Configurando Green-API...")
-            conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+            conectado, mensaje = configurar_green_api(
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             print(f"\n4. Estado después de configuración:")
             print(f"   Modo simulación: {green_api_sender.simulate_mode}")
@@ -36,7 +46,10 @@ def verificar_configuracion():
             
             if not green_api_sender.simulate_mode:
                 print(f"\n5. Haciendo prueba de envío...")
-                success, error = green_api_sender.send_message("34625433667", "Prueba de envío real")
+                success, error = green_api_sender.send_message(
+                    GREEN_API_PHONE or "34625433667",
+                    "Prueba de envío real",
+                )
                 print(f"   Resultado: {success}")
                 if error:
                     print(f"   Error: {error}")
@@ -48,6 +61,8 @@ def verificar_configuracion():
 
 if __name__ == '__main__':
     verificar_configuracion()
+
+
 
 
 

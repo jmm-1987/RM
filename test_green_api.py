@@ -27,7 +27,12 @@ def test_green_api():
         print("\n🔌 Probando conexión...")
         from whatsapp_sender import configurar_green_api
         
-        conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+        conectado, mensaje = configurar_green_api(
+            GREEN_API_URL,
+            GREEN_API_TOKEN,
+            GREEN_API_INSTANCE_ID,
+            GREEN_API_PHONE,
+        )
         
         if conectado:
             print("✅ Conexión exitosa!")

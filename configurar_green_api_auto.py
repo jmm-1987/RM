@@ -12,7 +12,12 @@ def configurar_green_api_automatico():
     with app.app_context():
         try:
             # Intentar importar la configuración
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
+            from green_api_config import (
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             print("Configurando Green-API...")
             print(f"URL: {GREEN_API_URL}")
@@ -26,7 +31,12 @@ def configurar_green_api_automatico():
                 return False, "Token no configurado"
             
             # Configurar Green-API
-            conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+            conectado, mensaje = configurar_green_api(
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             if conectado:
                 print(f"✅ Green-API configurado exitosamente: {mensaje}")

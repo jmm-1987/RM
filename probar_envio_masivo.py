@@ -16,8 +16,18 @@ def probar_envio_masivo():
         
         try:
             # Configurar Green-API
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
-            conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+            from green_api_config import (
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
+            conectado, mensaje = configurar_green_api(
+                GREEN_API_URL,
+                GREEN_API_TOKEN,
+                GREEN_API_INSTANCE_ID,
+                GREEN_API_PHONE,
+            )
             
             if not conectado:
                 print(f"Error: {mensaje}")
@@ -75,6 +85,8 @@ def probar_envio_masivo():
 
 if __name__ == '__main__':
     probar_envio_masivo()
+
+
 
 
 

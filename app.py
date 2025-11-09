@@ -827,17 +827,48 @@ def configuracion():
 
 @app.route('/configuracion/green-api', methods=['GET', 'POST'])
 def configurar_green_api_route():
+    config_data = {
+        'url': '',
+        'token': '',
+        'instance_id': '',
+        'phone': ''
+    }
+
+    try:
+        if os.environ.get('RENDER'):
+            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+        else:
+            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+
+        config_data = {
+            'url': GREEN_API_URL,
+            'token': GREEN_API_TOKEN,
+            'instance_id': GREEN_API_INSTANCE_ID,
+            'phone': GREEN_API_PHONE
+        }
+    except ImportError:
+        pass
+
     if request.method == 'POST':
         api_url = request.form.get('api_url')
         api_token = request.form.get('api_token')
-        
+        instance_id = request.form.get('instance_id')
+        phone = request.form.get('phone')
+
         if not api_url or not api_token:
             flash('Debe proporcionar tanto la URL como el token de Green-API', 'error')
             return redirect(url_for('configurar_green_api_route'))
-        
+
+        instance_id = instance_id or config_data.get('instance_id')
+        phone = phone or config_data.get('phone')
+
+        if not instance_id:
+            flash('Debe proporcionar el ID de instancia de Green-API', 'error')
+            return redirect(url_for('configurar_green_api_route'))
+
         # Configurar Green-API
-        conectado, mensaje = configurar_green_api(api_url, api_token)
-        
+        conectado, mensaje = configurar_green_api(api_url, api_token, instance_id, phone)
+
         if conectado:
             flash(f'Green-API configurado exitosamente: {mensaje}', 'success')
         else:
@@ -845,7 +876,7 @@ def configurar_green_api_route():
         
         return redirect(url_for('configuracion'))
     
-    return render_template('configurar_green_api.html')
+    return render_template('configurar_green_api.html', config=config_data)
 
 @app.route('/configuracion/test', methods=['POST'])
 def test_green_api():
@@ -891,7 +922,12 @@ def diagnostico_green_api():
         }
         
         # Probar conexión
-        conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+        conectado, mensaje = configurar_green_api(
+            GREEN_API_URL,
+            GREEN_API_TOKEN,
+            GREEN_API_INSTANCE_ID,
+            GREEN_API_PHONE,
+        )
         
         diagnostico['conexion'] = {
             'conectado': conectado,
@@ -1484,12 +1520,17 @@ if __name__ == '__main__':
         # Configurar Green-API automáticamente al iniciar
         try:
             if os.environ.get('RENDER'):
-                from config import GREEN_API_URL, GREEN_API_TOKEN
+                from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
             else:
-                from green_api_config import GREEN_API_URL, GREEN_API_TOKEN
+                from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
             
             if GREEN_API_TOKEN != 'TU_TOKEN_AQUI':
-                conectado, mensaje = configurar_green_api(GREEN_API_URL, GREEN_API_TOKEN)
+                conectado, mensaje = configurar_green_api(
+                    GREEN_API_URL,
+                    GREEN_API_TOKEN,
+                    GREEN_API_INSTANCE_ID,
+                    GREEN_API_PHONE,
+                )
                 if conectado:
                     print("✅ Green-API configurado automáticamente - ENVÍOS REALES ACTIVADOS")
                 else:

@@ -86,6 +86,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'whatsapp_web' %}active{% endif %}" href="{{ url_for('whatsapp_web') }}">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'enviar_masivo' %}active{% endif %}" href="{{ url_for('enviar_masivo') }}">
                             <i class="fas fa-paper-plane"></i> Envío Masivo
                         </a>
