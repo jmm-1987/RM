@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='whatsapp.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Conversaciones de WhatsApp</h1>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('whatsapp_new_conversation') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nueva conversación
+        </a>
+        <a href="{{ url_for('whatsapp_health_check') }}" class="btn btn-outline-secondary btn-sm">
+            Health check
+        </a>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#contactsModal">
+            Contactos
+        </button>
+    </div>
+</div>
+
+<div class="modal fade" id="contactsModal" tabindex="-1" aria-labelledby="contactsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactsModalLabel">Contactos guardados</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contacts-loading" class="text-center my-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+                <div id="contacts-error" class="alert alert-danger d-none"></div>
+                <div id="contacts-table-wrapper" class="table-responsive d-none">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th scope="col">Nombre</th>
+                                <th scope="col">Chat ID</th>
+                                <th scope="col">Tipo</th>
+                                <th scope="col">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contacts-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="conversation-list-wrapper" class="{% if not conversaciones %}d-none{% endif %}">
+    <div id="conversation-list" class="list-group shadow-sm">
+        {% for conversation in conversaciones %}
+            {% set last = conversation.last_message() %}
+            {% set unread = conversation.unread_count() %}
+            <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('whatsapp_conversation_detail', conversation_id=conversation.id) }}">
+                <div>
+                    <div class="fw-semibold">
+                        {{ conversation.contact_name or conversation.contact_number|chat_display }}
+                        {% if unread %}
+                            <span class="badge rounded-pill bg-danger ms-2">{{ unread }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-muted small text-truncate" style="max-width: 420px;">
+                        {% if last %}
+                            {% if last.sender_type == "agent" %}
+                                Tú:
+                            {% else %}
+                                Cliente:
+                            {% endif %}
+                            {{ last.message_text }}
+                        {% else %}
+                            Sin mensajes todavía
+                        {% endif %}
+                    </div>
+                </div>
+                <small class="text-muted">
+                    {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+                </small>
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="conversation-empty" class="alert alert-info {% if conversaciones %}d-none{% endif %}">
+    Aún no hay conversaciones. Puedes iniciarlas con el botón <strong>Nueva conversación</strong> o esperar a que lleguen mensajes desde WhatsApp.
+</div>
+
+<script>
+(function() {
+    const listWrapper = document.getElementById("conversation-list-wrapper");
+    const listElement = document.getElementById("conversation-list");
+    const emptyAlert = document.getElementById("conversation-empty");
+
+    if (!listElement) {
+        return;
+    }
+
+    const apiUrl = "{{ url_for('whatsapp_api_conversations') }}";
+
+    function renderConversations(items) {
+        if (!items.length) {
+            if (listWrapper) {
+                listWrapper.classList.add("d-none");
+            }
+            if (emptyAlert) {
+                emptyAlert.classList.remove("d-none");
+            }
+            listElement.innerHTML = "";
+            return;
+        }
+
+        if (listWrapper) {
+            listWrapper.classList.remove("d-none");
+        }
+        if (emptyAlert) {
+            emptyAlert.classList.add("d-none");
+        }
+
+        listElement.innerHTML = "";
+
+        items.forEach((item) => {
+            const link = document.createElement("a");
+            link.className = "list-group-item list-group-item-action d-flex justify-content-between";
+            link.href = item.url;
+
+            const left = document.createElement("div");
+
+            const title = document.createElement("div");
+            title.className = "fw-semibold";
+            title.textContent = item.display_name;
+
+            if (item.unread_count) {
+                const badge = document.createElement("span");
+                badge.className = "badge rounded-pill bg-danger ms-2";
+                badge.textContent = item.unread_count;
+                title.appendChild(badge);
+            }
+
+            const snippet = document.createElement("div");
+            snippet.className = "text-muted small text-truncate";
+            snippet.style.maxWidth = "420px";
+
+            if (item.last_message_text) {
+                const prefix = item.last_message_sender === "agent" ? "Tú: " : item.last_message_sender === "customer" ? "Cliente: " : "";
+                snippet.textContent = prefix + item.last_message_text;
+            } else {
+                snippet.textContent = "Sin mensajes todavía";
+            }
+
+            left.appendChild(title);
+            left.appendChild(snippet);
+
+            const time = document.createElement("small");
+            time.className = "text-muted";
+            time.textContent = item.updated_at_human || "";
+
+            link.appendChild(left);
+            link.appendChild(time);
+
+            listElement.appendChild(link);
+        });
+    }
+
+    function fetchConversations() {
+        fetch(apiUrl)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("No fue posible actualizar la bandeja");
+                }
+                return response.json();
+            })
+            .then((payload) => {
+                if (Array.isArray(payload.conversations)) {
+                    renderConversations(payload.conversations);
+                }
+            })
+            .catch((error) => console.error(error));
+    }
+
+    setInterval(fetchConversations, 5000);
+
+    const contactsModal = document.getElementById("contactsModal");
+    if (!contactsModal) {
+        return;
+    }
+
+    const contactsLoading = document.getElementById("contacts-loading");
+    const contactsError = document.getElementById("contacts-error");
+    const contactsWrapper = document.getElementById("contacts-table-wrapper");
+    const contactsTableBody = document.getElementById("contacts-table-body");
+
+    function renderContacts(contacts) {
+        contactsTableBody.innerHTML = "";
+
+        contacts.forEach((contact) => {
+            const row = document.createElement("tr");
+
+            const nameCell = document.createElement("td");
+            nameCell.textContent = contact.name || contact.chat_id || "Sin nombre";
+
+            const idCell = document.createElement("td");
+            idCell.textContent = contact.chat_id || "";
+
+            const typeCell = document.createElement("td");
+            typeCell.textContent = contact.type || "-";
+
+            const actionsCell = document.createElement("td");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-sm btn-outline-success";
+            button.textContent = "Abrir";
+            button.addEventListener("click", () => {
+                const phone = contact.chat_id ? contact.chat_id.replace(/@.*/, "") : "";
+                if (phone) {
+                    window.location.href = "{{ url_for('whatsapp_new_conversation') }}" + "?number=" + encodeURIComponent(phone);
+                } else {
+                    alert("No se puede iniciar conversación: falta el chatId");
+                }
+            });
+            actionsCell.appendChild(button);
+
+            row.appendChild(nameCell);
+            row.appendChild(idCell);
+            row.appendChild(typeCell);
+            row.appendChild(actionsCell);
+
+            contactsTableBody.appendChild(row);
+        });
+    }
+
+    contactsModal.addEventListener("show.bs.modal", function () {
+        contactsLoading.classList.remove("d-none");
+        contactsError.classList.add("d-none");
+        contactsWrapper.classList.add("d-none");
+
+        fetch("{{ url_for('whatsapp_api_contacts') }}")
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("No se pudo obtener la lista de contactos");
+                }
+                return response.json();
+            })
+            .then((payload) => {
+                const contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
+                renderContacts(contacts);
+                contactsWrapper.classList.remove("d-none");
+            })
+            .catch((error) => {
+                contactsError.textContent = error.message;
+                contactsError.classList.remove("d-none");
+            })
+            .finally(() => {
+                contactsLoading.classList.add("d-none");
+            });
+    });
+})();
+</script>
+{% endblock %}
+

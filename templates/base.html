@@ -86,7 +86,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'whatsapp_web' %}active{% endif %}" href="{{ url_for('whatsapp_web') }}">
+                        <a class="nav-link {% if request.endpoint in ['whatsapp_dashboard', 'whatsapp_conversation_detail', 'whatsapp_new_conversation'] %}active{% endif %}" href="{{ url_for('whatsapp_dashboard') }}">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
                     </li>

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Conversación | WhatsApp{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='whatsapp.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('whatsapp_dashboard') }}" class="btn btn-link ps-0">&larr; Volver</a>
+</div>
+
+<div class="card shadow-sm conversation-card">
+    <div class="card-header">
+        <h2 class="h5 mb-0">{{ conversation.contact_name or conversation.contact_number|chat_display }}</h2>
+        <small class="text-muted" id="conversation-updated">
+            Última actualización: {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
+        </small>
+    </div>
+    <div
+        class="card-body conversation-thread"
+        id="conversation-thread"
+        data-conversation-id="{{ conversation.id }}"
+        data-fetch-url="{{ url_for('whatsapp_api_conversation_messages', conversation_id=conversation.id) }}"
+        data-last-id="{{ (messages|last).id if messages else 0 }}"
+    >
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message-bubble {% if message.sender_type == 'agent' %}message-agent{% else %}message-customer{% endif %}">
+                    <div class="message-meta">
+                        {% if message.sender_type == 'agent' %}
+                            <span class="badge bg-primary">Agente</span>
+                        {% else %}
+                            <span class="badge bg-success">Cliente</span>
+                        {% endif %}
+                        <small class="text-muted">{{ message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
+                    </div>
+                    <div class="message-text">{{ message.message_text | nl2br }}</div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted text-center">No hay mensajes en esta conversación.</p>
+        {% endif %}
+    </div>
+    <div class="card-footer">
+        <form method="post" class="d-flex gap-2" id="message-form">
+            <textarea
+                name="message"
+                class="form-control"
+                rows="2"
+                placeholder="Escribe tu respuesta..."
+                required
+                id="message-input"
+            ></textarea>
+            <button class="btn btn-success" type="submit">Enviar</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    const thread = document.getElementById("conversation-thread");
+    if (!thread) {
+        return;
+    }
+
+    const fetchUrl = thread.dataset.fetchUrl;
+    let lastId = Number(thread.dataset.lastId || 0);
+    const updatedLabel = document.getElementById("conversation-updated");
+
+    function appendMessage(msg) {
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble " + (msg.sender_type === "agent" ? "message-agent" : "message-customer");
+
+        const meta = document.createElement("div");
+        meta.className = "message-meta";
+
+        const badge = document.createElement("span");
+        badge.className = "badge " + (msg.sender_type === "agent" ? "bg-primary" : "bg-success");
+        badge.textContent = msg.sender_type === "agent" ? "Agente" : "Cliente";
+
+        const timestamp = document.createElement("small");
+        timestamp.className = "text-muted";
+        timestamp.textContent = msg.sent_at_human;
+
+        meta.appendChild(badge);
+        meta.appendChild(timestamp);
+        bubble.appendChild(meta);
+
+        const text = document.createElement("div");
+        text.className = "message-text";
+        text.textContent = msg.message_text;
+        bubble.appendChild(text);
+
+        thread.appendChild(bubble);
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    function fetchMessages() {
+        const url = new URL(fetchUrl, window.location.origin);
+        url.searchParams.set("after_id", lastId);
+        url.searchParams.set("mark_read", "1");
+
+        fetch(url)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Error al actualizar la conversación");
+                }
+                return response.json();
+            })
+            .then((payload) => {
+                if (Array.isArray(payload.messages) && payload.messages.length > 0) {
+                    payload.messages.forEach((message) => {
+                        appendMessage(message);
+                        lastId = Math.max(lastId, message.id);
+                    });
+                    thread.dataset.lastId = String(lastId);
+                }
+                if (payload.updated_at_human && updatedLabel) {
+                    updatedLabel.textContent = "Última actualización: " + payload.updated_at_human;
+                }
+            })
+            .catch((error) => {
+                console.error(error);
+            });
+    }
+
+    setInterval(fetchMessages, 5000);
+
+    const form = document.getElementById("message-form");
+    const textarea = document.getElementById("message-input");
+
+    if (form && textarea) {
+        textarea.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                form.requestSubmit();
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}
+

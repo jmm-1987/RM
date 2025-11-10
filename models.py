@@ -143,3 +143,44 @@ class ProgramacionMasiva(db.Model):
 
     def __repr__(self):
         return f'<ProgramacionMasiva zona={self.zona_id} hora={self.hora} dias={self.dias_semana}>'
+
+
+class WhatsAppConversation(db.Model):
+    __tablename__ = 'whatsapp_conversation'
+
+    id = db.Column(db.Integer, primary_key=True)
+    contact_number = db.Column(db.String(64), nullable=False, index=True)
+    contact_name = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    messages = db.relationship(
+        'WhatsAppMessage',
+        backref='conversation',
+        lazy='dynamic',
+        cascade='all, delete-orphan'
+    )
+
+    def last_message(self):
+        return self.messages.order_by(WhatsAppMessage.sent_at.desc(), WhatsAppMessage.id.desc()).first()
+
+    def unread_count(self):
+        return self.messages.filter_by(sender_type='customer', is_read=False).count()
+
+    def __repr__(self):
+        return f'<WhatsAppConversation {self.contact_number}>'
+
+
+class WhatsAppMessage(db.Model):
+    __tablename__ = 'whatsapp_message'
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('whatsapp_conversation.id'), nullable=False, index=True)
+    sender_type = db.Column(db.String(32), nullable=False)  # 'customer' o 'agent'
+    message_text = db.Column(db.Text, nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    external_id = db.Column(db.String(128), index=True)
+    is_read = db.Column(db.Boolean, default=True, nullable=False, index=True)
+
+    def __repr__(self):
+        return f'<WhatsAppMessage {self.id} {self.sender_type}>'

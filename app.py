@@ -1,10 +1,25 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
-from models import db, Zona, Cliente, MensajePlantilla, MensajeEnviado, Oferta, MensajeOferta, MensajeRecibido, RespuestaMensaje, ProgramacionMasiva
+from markupsafe import Markup
+from models import (
+    db,
+    Zona,
+    Cliente,
+    MensajePlantilla,
+    MensajeEnviado,
+    Oferta,
+    MensajeOferta,
+    MensajeRecibido,
+    RespuestaMensaje,
+    ProgramacionMasiva,
+    WhatsAppConversation,
+    WhatsAppMessage,
+)
 from whatsapp_sender import enviar_whatsapp, configurar_green_api, green_api_sender
 from datetime import datetime, date, timezone
 import os
 import threading
 import time as _time
+import requests
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -36,6 +51,191 @@ db.init_app(app)
 # Variable para controlar la inicialización
 _sistema_inicializado = False
 _scheduler_iniciado = False
+
+
+def _chat_display(value: str) -> str:
+    if not value:
+        return ""
+    if value.endswith("@c.us") or value.endswith("@s.whatsapp.net"):
+        return value.split("@", 1)[0]
+    return value
+
+
+def _normalize_chat_id(raw_number: str) -> str:
+    if not raw_number:
+        raise ValueError("El número de WhatsApp no puede estar vacío")
+
+    raw_number = raw_number.strip()
+    if "@" in raw_number:
+        return raw_number
+
+    digits = "".join(filter(str.isdigit, raw_number))
+    if not digits:
+        raise ValueError("El número de WhatsApp debe contener al menos un dígito")
+
+    if digits.startswith("6") and len(digits) == 9:
+        digits = "34" + digits
+    elif digits.startswith("600") and len(digits) == 12:
+        digits = "34" + digits[1:]
+
+    return f"{digits}@c.us"
+
+
+def _green_api_credentials():
+    api_url = getattr(green_api_sender, "api_url", None)
+    api_token = getattr(green_api_sender, "api_token", None)
+    instance_id = getattr(green_api_sender, "instance_id", None)
+
+    if green_api_sender.simulate_mode or not all([api_url, api_token, instance_id]):
+        raise RuntimeError("Green-API no está configurado para envíos reales")
+
+    return api_url, api_token, instance_id
+
+
+def _send_green_api_message(chat_id: str, message: str) -> str | None:
+    api_url, api_token, instance_id = _green_api_credentials()
+    normalized_chat_id = _normalize_chat_id(chat_id)
+    url = f"{api_url}/waInstance{instance_id}/sendMessage/{api_token}"
+    response = requests.post(
+        url,
+        json={"chatId": normalized_chat_id, "message": message},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    if response.headers.get("content-type", "").startswith("application/json"):
+        data = response.json()
+        return data.get("idMessage")
+    return None
+
+
+def _fetch_green_api_contacts() -> list[dict]:
+    api_url, api_token, instance_id = _green_api_credentials()
+    url = f"{api_url}/waInstance{instance_id}/getContacts/{api_token}"
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    contacts = data.get("contacts") if isinstance(data, dict) else None
+    if contacts is None:
+        raise ValueError("Respuesta inesperada al solicitar contactos en Green-API")
+    return contacts
+
+
+def _ensure_whatsapp_conversation(chat_id: str, contact_name: str | None = None, created_at: datetime | None = None) -> WhatsAppConversation:
+    chat_id = _normalize_chat_id(chat_id)
+    conversation = WhatsAppConversation.query.filter_by(contact_number=chat_id).first()
+    timestamp = created_at or datetime.utcnow()
+
+    if not conversation:
+        conversation = WhatsAppConversation(
+            contact_number=chat_id,
+            contact_name=contact_name,
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        db.session.add(conversation)
+        db.session.flush()
+    else:
+        if contact_name and not conversation.contact_name:
+            conversation.contact_name = contact_name
+
+    conversation.updated_at = datetime.utcnow()
+    return conversation
+
+
+def _append_whatsapp_message(
+    conversation: WhatsAppConversation,
+    sender_type: str,
+    message_text: str,
+    sent_at: datetime | None = None,
+    external_id: str | None = None,
+    is_read: bool = True,
+) -> WhatsAppMessage:
+    message = WhatsAppMessage(
+        conversation_id=conversation.id,
+        sender_type=sender_type,
+        message_text=message_text,
+        sent_at=sent_at or datetime.utcnow(),
+        external_id=external_id,
+        is_read=is_read,
+    )
+    conversation.updated_at = datetime.utcnow()
+    db.session.add(message)
+    return message
+
+
+def _register_incoming_whatsapp_message(
+    chat_id: str,
+    message_text: str,
+    contact_name: str | None = None,
+    sent_at: datetime | None = None,
+    external_id: str | None = None,
+):
+    conversation = _ensure_whatsapp_conversation(chat_id, contact_name, sent_at)
+    _append_whatsapp_message(
+        conversation,
+        sender_type="customer",
+        message_text=message_text,
+        sent_at=sent_at,
+        external_id=external_id,
+        is_read=False,
+    )
+
+
+def _register_outgoing_whatsapp_message(
+    chat_id: str,
+    message_text: str,
+    sent_at: datetime | None = None,
+    external_id: str | None = None,
+):
+    conversation = _ensure_whatsapp_conversation(chat_id)
+    _append_whatsapp_message(
+        conversation,
+        sender_type="agent",
+        message_text=message_text,
+        sent_at=sent_at,
+        external_id=external_id,
+        is_read=True,
+    )
+
+
+def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
+    last = conversation.last_message()
+    return {
+        "id": conversation.id,
+        "display_name": conversation.contact_name or _chat_display(conversation.contact_number),
+        "contact_number": conversation.contact_number,
+        "last_message_text": last.message_text if last else "",
+        "last_message_sender": last.sender_type if last else None,
+        "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
+        "updated_at_human": conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "",
+        "unread_count": conversation.unread_count(),
+        "url": url_for("whatsapp_conversation_detail", conversation_id=conversation.id),
+    }
+
+
+def _message_to_dict(message: WhatsAppMessage) -> dict:
+    return {
+        "id": message.id,
+        "conversation_id": message.conversation_id,
+        "sender_type": message.sender_type,
+        "message_text": message.message_text,
+        "sent_at": message.sent_at.isoformat() if message.sent_at else None,
+        "sent_at_human": message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "",
+        "is_read": message.is_read,
+    }
+
+
+@app.template_filter("nl2br")
+def nl2br_filter(value: str | None) -> Markup:
+    if value is None:
+        return Markup("")
+    return Markup(str(value).replace("\n", "<br>"))
+
+
+@app.template_filter("chat_display")
+def chat_display_filter(value: str | None) -> str:
+    return _chat_display(value)
 
 
 def _ejecutor_programaciones():
@@ -82,6 +282,16 @@ def _ejecutor_programaciones():
                         )
 
                         success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
+
+                        if success:
+                            try:
+                                _register_outgoing_whatsapp_message(
+                                    cliente.telefono,
+                                    mensaje_personalizado,
+                                    sent_at=datetime.now(timezone.utc)
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
 
                         registro = MensajeEnviado(
                             cliente_id=cliente.id,
@@ -1114,6 +1324,35 @@ def webhook_whatsapp():
             )
             
             db.session.add(mensaje_recibido)
+
+            # Registrar en conversaciones avanzadas
+            chat_id_full = sender_data.get('sender') or sender_data.get('chatId') or ''
+            if not chat_id_full and telefono_remitente:
+                try:
+                    chat_id_full = _normalize_chat_id(telefono_remitente)
+                except ValueError:
+                    chat_id_full = ''
+
+            if chat_id_full:
+                timestamp = mensaje_data.get('timestamp') or payload.get('timestamp')
+                if timestamp:
+                    try:
+                        sent_at = datetime.utcfromtimestamp(timestamp)
+                    except Exception:
+                        sent_at = datetime.utcnow()
+                else:
+                    sent_at = datetime.utcnow()
+                try:
+                    _register_incoming_whatsapp_message(
+                        chat_id_full,
+                        mensaje_texto,
+                        contact_name=sender_data.get('senderName'),
+                        sent_at=sent_at,
+                        external_id=mensaje_data.get('idMessage', '')
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
+
             db.session.commit()
             
             print(f"✅ Mensaje recibido de {telefono_remitente}: {mensaje_texto[:50]}...")
@@ -1175,6 +1414,14 @@ def responder_mensaje(mensaje_id):
         # Marcar mensaje original como respondido si se envió correctamente
         if success:
             mensaje.respondido = True
+            try:
+                _register_outgoing_whatsapp_message(
+                    mensaje.telefono_remitente,
+                    respuesta_texto,
+                    sent_at=datetime.utcnow(),
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"⚠️ No se pudo registrar la respuesta en conversaciones avanzadas: {exc}")
         
         db.session.commit()
         
@@ -1232,6 +1479,168 @@ def ver_conversacion(mensaje_id):
                          conversacion=conversacion,
                          telefono=mensaje.telefono_remitente,
                          nombre=mensaje.nombre_remitente)
+
+# Interfaces de WhatsApp avanzadas
+@app.route('/whatsapp')
+def whatsapp_dashboard():
+    conversaciones = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).all()
+    return render_template('whatsapp/index.html', conversaciones=conversaciones)
+
+
+@app.route('/whatsapp/conversaciones/nueva', methods=['GET', 'POST'])
+def whatsapp_new_conversation():
+    if request.method == 'POST':
+        raw_number = (request.form.get('contact_number') or '').strip()
+        contact_name = (request.form.get('contact_name') or '').strip() or None
+        initial_message = (request.form.get('initial_message') or '').strip()
+
+        if not raw_number:
+            flash('Debes indicar un número de WhatsApp', 'error')
+            return render_template('whatsapp/new_conversation.html')
+
+        try:
+            chat_id = _normalize_chat_id(raw_number)
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return render_template('whatsapp/new_conversation.html')
+
+        existing = WhatsAppConversation.query.filter_by(contact_number=chat_id).first()
+        if existing:
+            flash('Ya existe una conversación con ese número.', 'info')
+            return redirect(url_for('whatsapp_conversation_detail', conversation_id=existing.id))
+
+        conversation = _ensure_whatsapp_conversation(chat_id, contact_name, datetime.utcnow())
+
+        if initial_message:
+            try:
+                external_id = _send_green_api_message(chat_id, initial_message)
+            except Exception as exc:  # noqa: BLE001
+                db.session.rollback()
+                flash(f'No fue posible enviar el mensaje inicial: {exc}', 'error')
+                return render_template('whatsapp/new_conversation.html')
+
+            _append_whatsapp_message(
+                conversation,
+                sender_type='agent',
+                message_text=initial_message,
+                sent_at=datetime.utcnow(),
+                external_id=external_id,
+                is_read=True,
+            )
+
+        db.session.commit()
+        flash('Conversación creada correctamente.', 'success')
+        return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+    return render_template('whatsapp/new_conversation.html')
+
+
+@app.route('/whatsapp/conversaciones/<int:conversation_id>', methods=['GET', 'POST'])
+def whatsapp_conversation_detail(conversation_id):
+    conversation = WhatsAppConversation.query.get_or_404(conversation_id)
+
+    if request.method == 'POST':
+        message_text = (request.form.get('message') or '').strip()
+
+        if not message_text:
+            flash('El mensaje no puede estar vacío', 'error')
+            return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+        try:
+            external_id = _send_green_api_message(conversation.contact_number, message_text)
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            flash(f'Error enviando mensaje: {exc}', 'error')
+            return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+        _append_whatsapp_message(
+            conversation,
+            sender_type='agent',
+            message_text=message_text,
+            sent_at=datetime.utcnow(),
+            external_id=external_id,
+            is_read=True,
+        )
+        db.session.commit()
+        flash('Mensaje enviado correctamente', 'success')
+        return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+    unread_messages = conversation.messages.filter_by(sender_type='customer', is_read=False).all()
+    if unread_messages:
+        for msg in unread_messages:
+            msg.is_read = True
+        db.session.commit()
+        conversation = WhatsAppConversation.query.get_or_404(conversation_id)
+
+    messages = conversation.messages.order_by(WhatsAppMessage.sent_at.asc(), WhatsAppMessage.id.asc()).all()
+    return render_template('whatsapp/conversation.html', conversation=conversation, messages=messages)
+
+
+@app.get('/whatsapp/api/conversaciones')
+def whatsapp_api_conversations():
+    conversaciones = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).all()
+    data = [_conversation_to_dict(c) for c in conversaciones]
+    return jsonify({'conversations': data})
+
+
+@app.get('/whatsapp/api/conversaciones/<int:conversation_id>/mensajes')
+def whatsapp_api_conversation_messages(conversation_id):
+    conversation = WhatsAppConversation.query.get_or_404(conversation_id)
+    after_id = request.args.get('after_id', default=0, type=int)
+    mark_read = request.args.get('mark_read', default='0').lower() in {'1', 'true', 'yes'}
+
+    query = WhatsAppMessage.query.filter(
+        WhatsAppMessage.conversation_id == conversation.id,
+        WhatsAppMessage.id > after_id,
+    ).order_by(WhatsAppMessage.id.asc())
+
+    messages = query.all()
+    changed = False
+    last_id = after_id
+    serialized = []
+
+    for message in messages:
+        serialized.append(_message_to_dict(message))
+        last_id = max(last_id, message.id)
+        if mark_read and message.sender_type == 'customer' and not message.is_read:
+            message.is_read = True
+            changed = True
+
+    if changed:
+        db.session.commit()
+
+    return jsonify({
+        'messages': serialized,
+        'last_id': last_id,
+        'unread_count': conversation.unread_count(),
+        'updated_at': conversation.updated_at.isoformat() if conversation.updated_at else None,
+        'updated_at_human': conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else '',
+    })
+
+
+@app.get('/whatsapp/api/contactos')
+def whatsapp_api_contacts():
+    try:
+        contacts = _fetch_green_api_contacts()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({'error': f'No fue posible obtener los contactos: {exc}'}), 502
+
+    normalized = []
+    for contact in contacts:
+        normalized.append({
+            'id': contact.get('id'),
+            'name': contact.get('name'),
+            'type': contact.get('type'),
+            'category': contact.get('category'),
+            'chat_id': contact.get('id'),
+        })
+
+    return jsonify({'contacts': normalized})
+
+
+@app.route('/whatsapp/health')
+def whatsapp_health_check():
+    return jsonify({'status': 'ok'}), 200
 
 # Ruta para polling de mensajes (respaldo al webhook)
 @app.route('/polling-mensajes')
@@ -1332,101 +1741,6 @@ def polling_mensajes():
 def activar_polling():
     """Página para activar el polling automático"""
     return render_template('activar_polling.html')
-
-# Rutas para WhatsApp Web integrado
-@app.route('/whatsapp-web')
-def whatsapp_web():
-    """Interfaz tipo WhatsApp Web integrada"""
-    return render_template('whatsapp_web.html')
-
-@app.route('/api/conversaciones')
-def api_conversaciones():
-    """API para obtener lista de conversaciones"""
-    try:
-        # Obtener conversaciones únicas con información del último mensaje
-        conversaciones = db.session.query(
-            MensajeRecibido.telefono_remitente,
-            MensajeRecibido.nombre_remitente,
-            db.func.max(MensajeRecibido.fecha_recepcion).label('ultima_fecha'),
-            db.func.count(MensajeRecibido.id).label('total_mensajes'),
-            db.func.sum(db.case([(MensajeRecibido.leido == False, 1)], else_=0)).label('no_leidos')
-        ).group_by(
-            MensajeRecibido.telefono_remitente,
-            MensajeRecibido.nombre_remitente
-        ).order_by(db.desc('ultima_fecha')).all()
-        
-        resultado = []
-        for conv in conversaciones:
-            # Obtener el último mensaje
-            ultimo_mensaje = MensajeRecibido.query.filter_by(
-                telefono_remitente=conv.telefono_remitente
-            ).order_by(MensajeRecibido.fecha_recepcion.desc()).first()
-            
-            resultado.append({
-                'telefono': conv.telefono_remitente,
-                'nombre': conv.nombre_remitente,
-                'ultimo_mensaje': ultimo_mensaje.mensaje[:50] + '...' if ultimo_mensaje and len(ultimo_mensaje.mensaje) > 50 else ultimo_mensaje.mensaje if ultimo_mensaje else '',
-                'ultima_fecha': conv.ultima_fecha.isoformat(),
-                'total_mensajes': conv.total_mensajes,
-                'no_leidos': conv.no_leidos or 0,
-                'id': hash(conv.telefono_remitente) % 1000000  # ID único simple
-            })
-        
-        return jsonify(resultado)
-        
-    except Exception as e:
-        print(f"Error obteniendo conversaciones: {e}")
-        return jsonify([])
-
-@app.route('/api/mensajes/<telefono>')
-def api_mensajes_telefono(telefono):
-    """API para obtener mensajes de una conversación específica"""
-    try:
-        # Obtener mensajes recibidos
-        mensajes_recibidos = MensajeRecibido.query.filter_by(
-            telefono_remitente=telefono
-        ).order_by(MensajeRecibido.fecha_recepcion.asc()).all()
-        
-        # Obtener respuestas enviadas
-        respuestas_enviadas = []
-        for msg in mensajes_recibidos:
-            respuestas = RespuestaMensaje.query.filter_by(
-                mensaje_recibido_id=msg.id
-            ).all()
-            respuestas_enviadas.extend(respuestas)
-        
-        # Combinar y ordenar
-        conversacion = []
-        
-        # Agregar mensajes recibidos
-        for msg in mensajes_recibidos:
-            conversacion.append({
-                'tipo': 'recibido',
-                'mensaje': msg.mensaje,
-                'fecha': msg.fecha_recepcion.isoformat(),
-                'tipo_mensaje': msg.tipo_mensaje,
-                'archivo_url': msg.archivo_url,
-                'leido': msg.leido
-            })
-        
-        # Agregar respuestas enviadas
-        for resp in respuestas_enviadas:
-            conversacion.append({
-                'tipo': 'enviado',
-                'mensaje': resp.respuesta,
-                'fecha': resp.fecha_envio.isoformat() if resp.fecha_envio else resp.created_at.isoformat(),
-                'tipo_mensaje': 'texto',
-                'enviado': resp.enviado
-            })
-        
-        # Ordenar por fecha
-        conversacion.sort(key=lambda x: x['fecha'])
-        
-        return jsonify(conversacion)
-        
-    except Exception as e:
-        print(f"Error obteniendo mensajes: {e}")
-        return jsonify([])
 
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""
