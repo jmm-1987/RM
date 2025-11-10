@@ -1263,13 +1263,13 @@ def eliminar_plantillas_temporales():
 def webhook_whatsapp():
     """Webhook para recibir mensajes de Green-API"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
         if not data:
             return jsonify({'status': 'error', 'message': 'No data received'}), 400
         
-        # Procesar mensaje recibido
-        mensaje_data = data.get('body', {})
+        # Procesar mensaje recibido (admite payloads antiguos y nuevos)
+        mensaje_data = data.get('body') or data
         
         if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
             # Extraer información del mensaje
@@ -1324,7 +1324,7 @@ def webhook_whatsapp():
             db.session.add(mensaje_recibido)
 
             # Registrar en conversaciones avanzadas
-            chat_id_full = sender_data.get('sender') or sender_data.get('chatId') or ''
+            chat_id_full = sender_data.get('chatId') or sender_data.get('sender')
             if not chat_id_full and telefono_remitente:
                 try:
                     chat_id_full = _normalize_chat_id(telefono_remitente)
