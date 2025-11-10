@@ -24,20 +24,14 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Configuración para producción
-if os.environ.get('RENDER'):
-    # Configuración para Render - usar PostgreSQL
-    from config import DATABASE_URL, SECRET_KEY, DEBUG, PORT
-    app.config['SECRET_KEY'] = SECRET_KEY
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['DEBUG'] = DEBUG
-else:
-    # Configuración para desarrollo local - usar SQLite local
-    app.config['SECRET_KEY'] = 'tu_clave_secreta_aqui'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///recambios.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['DEBUG'] = True
+# Configuración general (siempre SQLite por defecto)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///recambios.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['DEBUG'] = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 # Configuración común
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -1334,7 +1328,7 @@ def webhook_whatsapp():
                     chat_id_full = ''
 
             if chat_id_full:
-                timestamp = mensaje_data.get('timestamp') or payload.get('timestamp')
+                timestamp = mensaje_data.get('timestamp') or message_data.get('timestamp') or data.get('timestamp')
                 if timestamp:
                     try:
                         sent_at = datetime.utcfromtimestamp(timestamp)
