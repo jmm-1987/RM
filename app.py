@@ -42,6 +42,10 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 
+# Asegurar que las tablas existen (incluye las de WhatsApp)
+with app.app_context():
+    db.create_all()
+
 # Variable para controlar la inicialización
 _sistema_inicializado = False
 _scheduler_iniciado = False
