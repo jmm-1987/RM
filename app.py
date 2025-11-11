@@ -555,6 +555,99 @@ def clientes():
     zonas = Zona.query.all()
     return render_template('clientes.html', clientes=clientes, zonas=zonas, zona_seleccionada=zona_id)
 
+
+@app.route('/clientes/importar', methods=['POST'])
+def importar_clientes():
+    file = request.files.get('archivo_clientes')
+    if not file or file.filename == '':
+        flash('Debe seleccionar un archivo Excel para importar', 'error')
+        return redirect(url_for('clientes'))
+
+    try:
+        try:
+            import pandas as pd
+        except ImportError:
+            flash('Pandas no está instalado en el entorno. Solicita al administrador que añada pandas al proyecto.', 'error')
+            return redirect(url_for('clientes'))
+
+        df = pd.read_excel(file, engine='openpyxl')
+
+        columnas_esperadas = ["Codigo", "Nombre", "Teléfono", "Email", "Dirección", "Población", "Zona"]
+        if list(df.columns)[:len(columnas_esperadas)] != columnas_esperadas:
+            flash('Las columnas del Excel no coinciden con el formato esperado.', 'error')
+            return redirect(url_for('clientes'))
+
+        registros = []
+        zonas_cache = {zona.nombre.strip().lower(): zona for zona in Zona.query.all()}
+
+        for _, row in df.iterrows():
+            codigo = str(row["Codigo"]).strip() if not pd.isna(row["Codigo"]) else None
+            nombre = str(row["Nombre"]).strip() if not pd.isna(row["Nombre"]) else None
+            telefono = str(row["Teléfono"]).strip() if not pd.isna(row["Teléfono"]) else None
+            telefono = ''.join(filter(str.isdigit, telefono)) if telefono else None
+
+            if not codigo or not nombre or not telefono:
+                flash('Los campos Código, Nombre y Teléfono son obligatorios en todas las filas.', 'error')
+                return redirect(url_for('clientes'))
+
+            email = None if pd.isna(row["Email"]) else str(row["Email"]).strip()
+            direccion = None if pd.isna(row["Dirección"]) else str(row["Dirección"]).strip()
+            poblacion = None if pd.isna(row["Población"]) else str(row["Población"]).strip()
+            zona_nombre = None if pd.isna(row["Zona"]) else str(row["Zona"]).strip()
+
+            zona_id = None
+            if zona_nombre:
+                key = zona_nombre.lower()
+                zona = zonas_cache.get(key)
+                if not zona:
+                    zona = Zona(nombre=zona_nombre)
+                    db.session.add(zona)
+                    db.session.flush()
+                    zonas_cache[key] = zona
+                zona_id = zona.id
+            else:
+                zona = Zona.query.first()
+                if not zona:
+                    zona = Zona(nombre='General')
+                    db.session.add(zona)
+                    db.session.flush()
+                zona_id = zona.id
+
+            registros.append({
+                'codigo': codigo,
+                'nombre': nombre,
+                'telefono': telefono,
+                'email': email,
+                'direccion': direccion,
+                'poblacion': poblacion,
+                'zona_id': zona_id
+            })
+
+        Cliente.query.delete()
+        db.session.flush()
+
+        for data in registros:
+            cliente = Cliente(
+                nombre=data['nombre'],
+                telefono=data['telefono'],
+                email=data['email'],
+                direccion=data['direccion'],
+                poblacion=data['poblacion'],
+                zona_id=data['zona_id'],
+                activo=True,
+                incluir=True
+            )
+            db.session.add(cliente)
+
+        db.session.commit()
+        flash(f'Se importaron {len(registros)} clientes correctamente.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error importando clientes: {str(e)}', 'error')
+
+    return redirect(url_for('clientes'))
+
 @app.route('/clientes/editar/<int:cliente_id>', methods=['GET', 'POST'])
 def editar_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
@@ -597,8 +690,34 @@ def eliminar_cliente(cliente_id):
 
 @app.route('/zonas')
 def zonas():
-    zonas = Zona.query.all()
-    return render_template('zonas.html', zonas=zonas)
+    zonas = Zona.query.order_by(Zona.nombre.asc()).all()
+    zonas_data = [{'id': zona.id, 'nombre': zona.nombre} for zona in zonas]
+    return render_template('zonas.html', zonas=zonas, zonas_data=zonas_data)
+
+
+@app.route('/zonas/nueva', methods=['POST'])
+def crear_zona():
+    nombre = (request.form.get('nombre') or '').strip()
+    descripcion = (request.form.get('descripcion') or '').strip() or None
+
+    if not nombre:
+        flash('El nombre de la zona es obligatorio', 'error')
+        return redirect(url_for('zonas'))
+
+    try:
+        if Zona.query.filter(db.func.lower(Zona.nombre) == nombre.lower()).first():
+            flash('Ya existe una zona con ese nombre', 'error')
+            return redirect(url_for('zonas'))
+
+        zona = Zona(nombre=nombre, descripcion=descripcion)
+        db.session.add(zona)
+        db.session.commit()
+        flash(f'Zona "{nombre}" creada correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creando zona: {str(e)}', 'error')
+
+    return redirect(url_for('zonas'))
 
 @app.route('/zonas/editar/<int:zona_id>', methods=['GET', 'POST'])
 def editar_zona(zona_id):
@@ -626,22 +745,39 @@ def editar_zona(zona_id):
 @app.route('/zonas/eliminar/<int:zona_id>', methods=['POST'])
 def eliminar_zona(zona_id):
     zona = Zona.query.get_or_404(zona_id)
-    
-    # Verificar si hay clientes en esta zona
-    clientes_en_zona = Cliente.query.filter_by(zona_id=zona_id, activo=True).count()
-    
-    if clientes_en_zona > 0:
-        flash(f'No se puede eliminar la zona {zona.nombre} porque tiene {clientes_en_zona} cliente(s) activo(s)', 'error')
-        return redirect(url_for('zonas'))
-    
+
+    zona_destino_id = request.form.get('zona_destino', type=int)
+
     try:
+        clientes_en_zona = Cliente.query.filter_by(zona_id=zona_id).count()
+
+        if clientes_en_zona > 0:
+            if not zona_destino_id:
+                flash('La zona tiene clientes asignados. Debe seleccionar una zona destino para reasignarlos.', 'error')
+                return redirect(url_for('zonas'))
+
+            if zona_destino_id == zona_id:
+                flash('La zona destino no puede ser la misma que se desea eliminar.', 'error')
+                return redirect(url_for('zonas'))
+
+            zona_destino = Zona.query.get(zona_destino_id)
+            if not zona_destino:
+                flash('La zona destino seleccionada no existe.', 'error')
+                return redirect(url_for('zonas'))
+
+            Cliente.query.filter_by(zona_id=zona_id).update({'zona_id': zona_destino_id})
+
         db.session.delete(zona)
         db.session.commit()
-        flash(f'Zona {zona.nombre} eliminada exitosamente', 'success')
+
+        if clientes_en_zona > 0:
+            flash(f'Zona {zona.nombre} eliminada y {clientes_en_zona} cliente(s) reasignado(s).', 'success')
+        else:
+            flash(f'Zona {zona.nombre} eliminada exitosamente.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error eliminando zona: {str(e)}', 'error')
-    
+
     return redirect(url_for('zonas'))
 
 @app.route('/actualizar-plantillas-con-enlace')
@@ -995,9 +1131,32 @@ def toggle_oferta(id):
 # Rutas para la web pública
 @app.route('/panel')
 def panel():
-    zonas = Zona.query.all()
-    ofertas = Oferta.query.filter_by(activa=True).order_by(Oferta.created_at.desc()).limit(6).all()
-    return render_template('panel.html', zonas=zonas, ofertas=ofertas)
+    total_conversaciones = WhatsAppConversation.query.count()
+    total_clientes = Cliente.query.filter_by(activo=True).count()
+    total_ofertas = Oferta.query.filter_by(activa=True).count()
+    return render_template(
+        'panel.html',
+        total_conversaciones=total_conversaciones,
+        total_clientes=total_clientes,
+        total_ofertas=total_ofertas,
+    )
+
+
+@app.route('/panel/envios-masivos')
+def panel_envios_masivos():
+    total_clientes = Cliente.query.filter_by(activo=True).count()
+    total_zonas = Zona.query.count()
+    total_plantillas = MensajePlantilla.query.count()
+    total_historial = MensajeEnviado.query.count()
+    total_programaciones = ProgramacionMasiva.query.count()
+    return render_template(
+        'panel_envios.html',
+        total_clientes=total_clientes,
+        total_zonas=total_zonas,
+        total_plantillas=total_plantillas,
+        total_historial=total_historial,
+        total_programaciones=total_programaciones,
+    )
 
 @app.route('/publico/ofertas')
 def ofertas_publicas():

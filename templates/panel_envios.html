@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Envíos Masivos{% endblock %}
+
+{% block extra_head %}
+<style>
+    .envios-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .envio-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(246,249,255,0.9));
+        border-radius: 18px;
+        padding: 2rem;
+        text-align: center;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 1px solid rgba(13, 110, 253, 0.08);
+    }
+
+    .envio-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 45px rgba(13, 110, 253, 0.15);
+    }
+
+    .envio-card i {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: #0d6efd;
+    }
+
+    .envio-card h4 {
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .envio-card p {
+        color: #6c757d;
+        min-height: 48px;
+    }
+
+    .envio-card .btn {
+        margin-top: 1rem;
+        border-radius: 999px;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Ecosistema de Envíos Masivos</h1>
+            <p class="text-muted mb-0">Gestiona aquí todo lo relacionado con tus campañas de mensajería</p>
+        </div>
+        <a href="{{ url_for('panel') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Volver al panel
+        </a>
+    </div>
+
+    <div class="envios-grid">
+        <div class="envio-card">
+            <i class="fas fa-users"></i>
+            <h4>Clientes</h4>
+            <p>Importa y gestiona tus clientes para segmentar tus campañas.</p>
+            <div class="text-muted small mb-2">{{ total_clientes }} clientes activos</div>
+            <a href="{{ url_for('clientes') }}" class="btn btn-primary">
+                Gestionar clientes
+            </a>
+        </div>
+
+        <div class="envio-card">
+            <i class="fas fa-map-marker-alt"></i>
+            <h4>Zonas</h4>
+            <p>Organiza tus rutas y clasifica clientes por área de reparto.</p>
+            <div class="text-muted small mb-2">{{ total_zonas }} zonas configuradas</div>
+            <a href="{{ url_for('zonas') }}" class="btn btn-primary">
+                Administrar zonas
+            </a>
+        </div>
+
+        <div class="envio-card">
+            <i class="fas fa-comment-dots"></i>
+            <h4>Plantillas de mensajes</h4>
+            <p>Crea mensajes listos para usar en campañas individuales o masivas.</p>
+            <div class="text-muted small mb-2">{{ total_plantillas }} plantillas disponibles</div>
+            <a href="{{ url_for('mensajes') }}" class="btn btn-primary">
+                Gestionar plantillas
+            </a>
+        </div>
+
+        <div class="envio-card">
+            <i class="fas fa-paper-plane"></i>
+            <h4>Envío masivo</h4>
+            <p>Configura campañas y envía comunicaciones a clientes por zona.</p>
+            <a href="{{ url_for('enviar_masivo') }}" class="btn btn-success">
+                Lanzar campaña
+            </a>
+        </div>
+
+        <div class="envio-card">
+            <i class="fas fa-clock"></i>
+            <h4>Programaciones</h4>
+            <p>Automatiza envíos recurrentes para fechas y zonas concretas.</p>
+            <div class="text-muted small mb-2">{{ total_programaciones }} programaciones activas</div>
+            <a href="{{ url_for('programaciones') }}" class="btn btn-primary">
+                Programar envíos
+            </a>
+        </div>
+
+        <div class="envio-card">
+            <i class="fas fa-history"></i>
+            <h4>Historial de envíos</h4>
+            <p>Consulta campañas anteriores, seguimiento y resultados.</p>
+            <div class="text-muted small mb-2">{{ total_historial }} envíos registrados</div>
+            <a href="{{ url_for('historial') }}" class="btn btn-outline-primary">
+                Ver historial
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
