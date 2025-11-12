@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response, abort, has_request_context
 from markupsafe import Markup
 from models import (
     db,
@@ -25,6 +25,7 @@ from werkzeug.utils import secure_filename
 import base64
 import io
 from zoneinfo import ZoneInfo
+from collections import UserDict
 
 app = Flask(__name__)
 
@@ -81,6 +82,13 @@ except Exception:
 
 def _now():
     return datetime.now(_scheduler_tz)
+
+
+class _FormatoSeguro(UserDict):
+    """Permite usar str.format_map sin lanzar KeyError cuando faltan llaves."""
+
+    def __missing__(self, key):
+        return ""
 
 
 def _chat_display(value: str) -> str:
@@ -309,10 +317,20 @@ def _ejecutor_programaciones():
                     # Verificar día
                     dias = {int(d) for d in prog.dias_semana.split(',') if d.strip()}
                     if dia_semana not in dias:
+                        if prog.ultima_ejecucion != hoy:
+                            print(
+                                f"↷ Programación {prog.id} omitida: hoy es {dia_semana}, "
+                                f"válida para {sorted(dias)}"
+                            )
                         continue
 
                     # Verificar hora exacta (minuto)
                     if prog.hora != hora_actual:
+                        if prog.ultima_ejecucion != hoy:
+                            print(
+                                f"⌛ Programación {prog.id} aún no es su hora: "
+                                f"objetivo {prog.hora}, ahora {hora_actual}"
+                            )
                         continue
 
                     # Evitar ejecutar más de una vez por día
@@ -331,12 +349,17 @@ def _ejecutor_programaciones():
                     ).all()
 
                     for cliente in clientes:
-                        enlace_web = generar_enlace_web()
-                        mensaje_personalizado = plantilla.contenido.format(
-                            nombre_cliente=cliente.nombre,
-                            zona=zona.nombre,
-                            enlace_web=enlace_web
-                        )
+                        contexto_mensaje = _FormatoSeguro({
+                            "nombre_cliente": cliente.nombre,
+                            "cliente_nombre": cliente.nombre,
+                            "zona": zona.nombre,
+                            "zona_nombre": zona.nombre,
+                            "enlace_web": "",
+                            "link_ofertas": "",
+                            "telefono_cliente": cliente.telefono,
+                            "cliente_telefono": cliente.telefono,
+                        })
+                        mensaje_personalizado = plantilla.contenido.format_map(contexto_mensaje)
 
                         success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
 
@@ -588,14 +611,27 @@ def before_request():
 
 def generar_enlace_web():
     """Genera el enlace completo a la web pública de ofertas"""
-    if os.environ.get('RENDER'):
-        # En producción, usar la URL de Render
-        dominio = os.environ.get('RENDER_EXTERNAL_URL', request.url_root.rstrip('/'))
-    else:
-        # En desarrollo local
-        dominio = request.url_root.rstrip('/')
+    base_url = (
+        os.environ.get('PUBLIC_BASE_URL')
+        or os.environ.get('RENDER_EXTERNAL_URL')
+        or os.environ.get('EXTERNAL_URL')
+    )
+
+    if not base_url and has_request_context():
+        base_url = request.url_root.rstrip('/')
+
+    if not base_url:
+        # Fallback genérico para ejecución fuera de contexto de request
+        base_url = app.config.get('SERVER_NAME')
+        if base_url:
+            scheme = 'https' if app.config.get('PREFERRED_URL_SCHEME') == 'https' else 'http'
+            base_url = f"{scheme}://{base_url}"
+        else:
+            base_url = 'http://localhost:5000'
+
+    base_url = base_url.rstrip('/')
     
-    return f"{dominio}{url_for('ofertas_publicas')}"
+    return f"{base_url}{url_for('ofertas_publicas')}"
 
 @app.route('/')
 def index():
@@ -1115,15 +1151,19 @@ def enviar_masivo():
         fallidos = 0
         
         for cliente in clientes:
-            # Generar enlace a la web pública de ofertas
-            enlace_web = generar_enlace_web()
-            
-            # Personalizar mensaje con datos del cliente y enlace web
-            mensaje_personalizado = plantilla.contenido.format(
-                nombre_cliente=cliente.nombre,
-                zona=zona.nombre,
-                enlace_web=enlace_web
-            )
+            contexto_mensaje = _FormatoSeguro({
+                "nombre_cliente": cliente.nombre,
+                "cliente_nombre": cliente.nombre,
+                "zona": zona.nombre,
+                "zona_nombre": zona.nombre,
+                "enlace_web": "",
+                "link_ofertas": "",
+                "telefono_cliente": cliente.telefono,
+                "cliente_telefono": cliente.telefono,
+            })
+
+            # Personalizar mensaje con datos del cliente
+            mensaje_personalizado = plantilla.contenido.format_map(contexto_mensaje)
             
             # Enviar mensaje usando Green-API
             success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
