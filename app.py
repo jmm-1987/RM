@@ -300,6 +300,8 @@ def _ejecutor_programaciones():
             dia_semana = ahora.weekday()  # 0=Lunes ... 6=Domingo
             hora_actual = ahora.strftime('%H:%M')
             hoy = ahora.date()
+            # Debug: muestra el pulso del scheduler
+            print(f"⏱️ {_scheduler_tz_name} -> {ahora.strftime('%Y-%m-%d %H:%M:%S')} (weekday={dia_semana})")
 
             try:
                 programaciones = ProgramacionMasiva.query.filter_by(activo=True).all()
@@ -1206,7 +1208,8 @@ def nueva_programacion():
             plantilla_id=int(plantilla_id),
             dias_semana=','.join(dias_normalizados),
             hora=hora,
-            activo=True
+            activo=True,
+            ultima_ejecucion=None
         )
         db.session.add(programacion)
         db.session.commit()
@@ -1236,6 +1239,8 @@ def editar_programacion(id):
             programacion.zona_id = int(zona_id)
             programacion.plantilla_id = int(plantilla_id)
             programacion.dias_semana = ','.join(dias_normalizados)
+            if programacion.hora != hora:
+                programacion.ultima_ejecucion = None
             programacion.hora = hora
             db.session.commit()
             flash('Programación actualizada correctamente', 'success')
