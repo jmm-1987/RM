@@ -36,6 +36,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3 d-none" id="contacts-search-wrapper">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="search" class="form-control" id="contacts-search" placeholder="Buscar contacto...">
+                    </div>
+                </div>
                 <div id="contacts-loading" class="text-center my-4">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Cargando...</span>
@@ -224,6 +230,9 @@
     const contactsError = document.getElementById("contacts-error");
     const contactsWrapper = document.getElementById("contacts-table-wrapper");
     const contactsTableBody = document.getElementById("contacts-table-body");
+    const contactsSearchWrapper = document.getElementById("contacts-search-wrapper");
+    const contactsSearch = document.getElementById("contacts-search");
+    let cachedContacts = [];
 
     function renderContacts(contacts) {
         contactsTableBody.innerHTML = "";
@@ -243,7 +252,7 @@
             const row = document.createElement("tr");
 
             const nameCell = document.createElement("td");
-            nameCell.textContent = contact.name || contact.chat_id || "Sin nombre";
+            nameCell.textContent = (contact.name || "").trim() || contact.chat_id || "Sin nombre";
 
             const idCell = document.createElement("td");
             idCell.textContent = contact.chat_id || "";
@@ -279,6 +288,9 @@
         contactsLoading.classList.remove("d-none");
         contactsError.classList.add("d-none");
         contactsWrapper.classList.add("d-none");
+            contactsSearchWrapper.classList.add("d-none");
+            contactsSearch.value = "";
+            cachedContacts = [];
 
         fetch("{{ url_for('whatsapp_api_contacts') }}")
             .then((response) => {
@@ -288,9 +300,10 @@
                 return response.json();
             })
             .then((payload) => {
-                const contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
-                renderContacts(contacts);
+                cachedContacts = Array.isArray(payload.contacts) ? payload.contacts : [];
+                renderContacts(cachedContacts);
                 contactsWrapper.classList.remove("d-none");
+                contactsSearchWrapper.classList.remove("d-none");
             })
             .catch((error) => {
                 contactsError.textContent = error.message;
@@ -300,6 +313,24 @@
                 contactsLoading.classList.add("d-none");
             });
     });
+
+    if (contactsSearch) {
+        contactsSearch.addEventListener("input", function () {
+            const term = this.value.toLowerCase().trim();
+            if (!term) {
+                renderContacts(cachedContacts);
+                return;
+            }
+
+            const filtered = cachedContacts.filter(contact => {
+                const name = (contact.name || "").toLowerCase();
+                const chatId = (contact.chat_id || "").toLowerCase();
+                return name.includes(term) || chatId.includes(term);
+            });
+
+            renderContacts(filtered);
+        });
+    }
 })();
 </script>
 {% endblock %}

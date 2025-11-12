@@ -151,8 +151,10 @@ def _ensure_whatsapp_conversation(chat_id: str, contact_name: str | None = None,
         db.session.add(conversation)
         db.session.flush()
     else:
-        if contact_name and not conversation.contact_name:
-            conversation.contact_name = contact_name
+        if contact_name:
+            cleaned_name = contact_name.strip()
+            if cleaned_name and cleaned_name != conversation.contact_name:
+                conversation.contact_name = cleaned_name
 
     conversation.updated_at = datetime.utcnow()
     return conversation
@@ -1502,6 +1504,8 @@ def webhook_whatsapp():
             cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
             
             # Crear registro del mensaje recibido
+            chat_display_name = sender_data.get('chatName') or sender_data.get('senderName') or chat_id_full or telefono_remitente
+
             mensaje_recibido = MensajeRecibido(
                 telefono_remitente=telefono_remitente,
                 nombre_remitente=sender_data.get('senderName', ''),
@@ -1535,7 +1539,7 @@ def webhook_whatsapp():
                     _register_incoming_whatsapp_message(
                         chat_id_full,
                         mensaje_texto,
-                        contact_name=sender_data.get('senderName'),
+                        contact_name=chat_display_name,
                         sent_at=sent_at,
                         external_id=mensaje_data.get('idMessage', ''),
                         media_type=tipo_mensaje if tipo_mensaje != 'texto' else None,
@@ -1818,9 +1822,18 @@ def whatsapp_api_contacts():
 
     normalized = []
     for contact in contacts:
+        raw_name = (
+            contact.get('name')
+            or contact.get('contactName')
+            or contact.get('contactNameShort')
+            or contact.get('chatName')
+            or (contact.get('groupMetadata') or {}).get('subject')
+            or contact.get('pushname')
+            or ""
+        )
         normalized.append({
             'id': contact.get('id'),
-            'name': contact.get('name'),
+            'name': raw_name.strip() if isinstance(raw_name, str) else raw_name,
             'type': contact.get('type'),
             'category': contact.get('category'),
             'chat_id': contact.get('id'),
