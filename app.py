@@ -24,6 +24,7 @@ from sqlalchemy import text, inspect
 from werkzeug.utils import secure_filename
 import base64
 import io
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
@@ -69,6 +70,17 @@ with app.app_context():
 # Variable para controlar la inicialización
 _sistema_inicializado = False
 _scheduler_iniciado = False
+_scheduler_tz_name = os.environ.get('SCHEDULER_TZ', 'Europe/Madrid')
+try:
+    _scheduler_tz = ZoneInfo(_scheduler_tz_name)
+except Exception:
+    print(f"⚠️ Zona horaria '{_scheduler_tz_name}' no válida. Se usará UTC.")
+    _scheduler_tz_name = 'UTC'
+    _scheduler_tz = ZoneInfo('UTC')
+
+
+def _now():
+    return datetime.now(_scheduler_tz)
 
 
 def _chat_display(value: str) -> str:
@@ -284,9 +296,10 @@ def _ejecutor_programaciones():
     """Hilo en background que ejecuta envíos masivos programados por zona y hora."""
     with app.app_context():
         while True:
-            ahora = datetime.now()
+            ahora = _now()
             dia_semana = ahora.weekday()  # 0=Lunes ... 6=Domingo
             hora_actual = ahora.strftime('%H:%M')
+            hoy = ahora.date()
 
             try:
                 programaciones = ProgramacionMasiva.query.filter_by(activo=True).all()
@@ -301,7 +314,7 @@ def _ejecutor_programaciones():
                         continue
 
                     # Evitar ejecutar más de una vez por día
-                    if prog.ultima_ejecucion == date.today():
+                    if prog.ultima_ejecucion == hoy:
                         continue
 
                     # Ejecutar envío para la zona
@@ -330,7 +343,7 @@ def _ejecutor_programaciones():
                                 _register_outgoing_whatsapp_message(
                                     cliente.telefono,
                                     mensaje_personalizado,
-                                    sent_at=datetime.now(timezone.utc)
+                                    sent_at=_now().astimezone(timezone.utc)
                                 )
                             except Exception as exc:  # noqa: BLE001
                                 print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
@@ -340,13 +353,13 @@ def _ejecutor_programaciones():
                             plantilla_id=plantilla.id,
                             mensaje_final=mensaje_personalizado,
                             enviado=success,
-                            fecha_envio=datetime.now(timezone.utc) if success else None,
+                            fecha_envio=_now().astimezone(timezone.utc) if success else None,
                             error=error_msg if not success else None
                         )
                         db.session.add(registro)
 
                     # Marcar ejecución del día y confirmar
-                    prog.ultima_ejecucion = date.today()
+                    prog.ultima_ejecucion = hoy
                     db.session.commit()
 
             except Exception as e:
