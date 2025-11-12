@@ -43,26 +43,27 @@
                     </div>
                     <div class="message-content">
                         {% if message.media_type and message.media_url %}
+                            {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
                             {% if message.media_type == 'imagen' %}
-                                <a href="{{ message.media_url }}" target="_blank" rel="noopener" download class="media-link">
-                                    <img src="{{ message.media_url }}" alt="Imagen recibida" class="media-preview">
+                                <a href="{{ media_route }}" target="_blank" rel="noopener" download class="media-link">
+                                    <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview">
                                 </a>
                             {% elif message.media_type == 'video' %}
                                 <video controls class="media-preview video-preview">
-                                    <source src="{{ message.media_url }}">
+                                    <source src="{{ media_route }}">
                                     Tu navegador no soporta video.
                                 </video>
-                                <div><a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar video</a></div>
+                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar video</a></div>
                             {% elif message.media_type == 'audio' %}
                                 <audio controls class="audio-player">
-                                    <source src="{{ message.media_url }}">
+                                    <source src="{{ media_route }}">
                                     Tu navegador no soporta audio.
                                 </audio>
-                                <div><a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
+                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
                             {% else %}
                                 <div class="attachment-chip">
                                     <i class="fas fa-paperclip"></i>
-                                    <a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar archivo</a>
+                                    <a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar archivo</a>
                                 </div>
                             {% endif %}
                         {% endif %}
@@ -107,19 +108,20 @@
     const contactLabel = thread.dataset.contactName || "Cliente";
 
     function buildMediaContent(container, msg) {
-        if (msg.media_type && msg.media_url) {
+        if (msg.media_type && (msg.media_route || msg.media_url)) {
             const mediaWrapper = document.createElement("div");
             mediaWrapper.className = "message-media";
+            const sourceUrl = msg.media_route || msg.media_url;
 
             switch (msg.media_type) {
                 case "imagen":
                     const imgLink = document.createElement("a");
-                    imgLink.href = msg.media_url;
+                    imgLink.href = sourceUrl;
                     imgLink.target = "_blank";
                     imgLink.rel = "noopener";
                     imgLink.download = "";
                     const img = document.createElement("img");
-                    img.src = msg.media_url;
+                    img.src = sourceUrl;
                     img.alt = "Imagen recibida";
                     img.className = "media-preview";
                     imgLink.appendChild(img);
@@ -130,11 +132,11 @@
                     video.controls = true;
                     video.className = "media-preview video-preview";
                     const videoSource = document.createElement("source");
-                    videoSource.src = msg.media_url;
+                    videoSource.src = sourceUrl;
                     video.appendChild(videoSource);
                     mediaWrapper.appendChild(video);
                     const videoDownload = document.createElement("div");
-                    videoDownload.innerHTML = `<a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar video</a>`;
+                    videoDownload.innerHTML = `<a href="${sourceUrl}" target="_blank" rel="noopener" download>Descargar video</a>`;
                     mediaWrapper.appendChild(videoDownload);
                     break;
                 case "audio":
@@ -142,17 +144,17 @@
                     audio.controls = true;
                     audio.className = "audio-player";
                     const audioSource = document.createElement("source");
-                    audioSource.src = msg.media_url;
+                    audioSource.src = sourceUrl;
                     audio.appendChild(audioSource);
                     mediaWrapper.appendChild(audio);
                     const audioDownload = document.createElement("div");
-                    audioDownload.innerHTML = `<a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar audio</a>`;
+                    audioDownload.innerHTML = `<a href="${sourceUrl}" target="_blank" rel="noopener" download>Descargar audio</a>`;
                     mediaWrapper.appendChild(audioDownload);
                     break;
                 default:
                     const chip = document.createElement("div");
                     chip.className = "attachment-chip";
-                    chip.innerHTML = `<i class="fas fa-paperclip"></i> <a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar archivo</a>`;
+                    chip.innerHTML = `<i class="fas fa-paperclip"></i> <a href="${sourceUrl}" target="_blank" rel="noopener" download>Descargar archivo</a>`;
                     mediaWrapper.appendChild(chip);
                     break;
             }

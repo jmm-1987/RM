@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response, abort
 from markupsafe import Markup
 from models import (
     db,
@@ -22,6 +22,7 @@ import time as _time
 import requests
 from sqlalchemy import text, inspect
 from werkzeug.utils import secure_filename
+import base64
 
 app = Flask(__name__)
 
@@ -255,6 +256,7 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
         "is_read": message.is_read,
         "media_type": message.media_type,
         "media_url": message.media_url,
+        "media_route": url_for('whatsapp_media', message_id=message.id) if message.media_url else None,
     }
 
 
@@ -1846,6 +1848,46 @@ def whatsapp_api_contacts():
 def whatsapp_health_check():
     return jsonify({'status': 'ok'}), 200
 
+
+@app.route('/whatsapp/media/<int:message_id>')
+def whatsapp_media(message_id: int):
+    message = WhatsAppMessage.query.get_or_404(message_id)
+
+    if not message.media_url and not message.external_id:
+        abort(404)
+
+    try:
+        if message.media_url:
+            proxied = requests.get(message.media_url, timeout=30)
+            proxied.raise_for_status()
+            mime_type = proxied.headers.get('Content-Type', 'application/octet-stream')
+            return Response(proxied.content, mimetype=mime_type)
+    except requests.exceptions.RequestException:
+        pass
+
+    try:
+        api_url, api_token, instance_id = _green_api_credentials()
+    except Exception:
+        abort(404)
+
+    if not message.external_id:
+        abort(404)
+
+    try:
+        download_endpoint = f"{api_url}/waInstance{instance_id}/downloadFile/{api_token}"
+        resp = requests.get(download_endpoint, params={'idMessage': message.external_id}, timeout=30)
+        resp.raise_for_status()
+        payload = resp.json()
+        file_data_base64 = payload.get('fileData')
+        if not file_data_base64:
+            abort(404)
+        data = base64.b64decode(file_data_base64)
+        mime_type = payload.get('mimeType', 'application/octet-stream')
+        return Response(data, mimetype=mime_type)
+    except requests.exceptions.RequestException:
+        abort(404)
+
+# Ruta para polling de mensajes (respaldo al webhook)
 # Ruta para polling de mensajes (respaldo al webhook)
 @app.route('/polling-mensajes')
 def polling_mensajes():
