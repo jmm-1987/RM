@@ -77,7 +77,7 @@
         {% endif %}
     </div>
     <div class="card-footer">
-        <form method="post" class="d-flex gap-2" id="message-form">
+        <form method="post" class="d-flex gap-2 flex-wrap" id="message-form">
             <textarea
                 name="message"
                 class="form-control"
@@ -86,7 +86,10 @@
                 required
                 id="message-input"
             ></textarea>
-            <button class="btn btn-success" type="submit">Enviar</button>
+            <div class="d-flex flex-column align-items-end gap-2">
+                <button class="btn btn-success" type="submit">Enviar</button>
+                <div id="send-feedback" class="small text-success d-none"></div>
+            </div>
         </form>
     </div>
 </div>
@@ -227,12 +230,21 @@
 
     const form = document.getElementById("message-form");
     const textarea = document.getElementById("message-input");
+    const feedback = document.getElementById("send-feedback");
 
     if (form && textarea) {
         textarea.addEventListener("keydown", function(event) {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 form.requestSubmit();
+            }
+        });
+
+        form.addEventListener("submit", function() {
+            if (feedback) {
+                feedback.classList.add("d-none");
+                feedback.classList.remove("text-danger", "text-success");
+                feedback.textContent = "";
             }
         });
     }
@@ -243,6 +255,31 @@
             fetchMessages();
         });
     }
+
+    if (feedback) {
+        const successFlash = document.querySelector(".alert-success");
+        const errorFlash = document.querySelector(".alert-danger");
+
+        if (successFlash) {
+            feedback.textContent = successFlash.textContent.trim();
+            feedback.classList.remove("d-none", "text-danger");
+            feedback.classList.add("text-success");
+            successFlash.remove();
+        } else if (errorFlash) {
+            feedback.textContent = errorFlash.textContent.trim();
+            feedback.classList.remove("d-none", "text-success");
+            feedback.classList.add("text-danger");
+            errorFlash.remove();
+        }
+
+        if (!feedback.classList.contains("d-none")) {
+            setTimeout(() => {
+                feedback.classList.add("d-none");
+            }, 4000);
+        }
+    }
+
+    thread.scrollTop = thread.scrollHeight;
 })();
 </script>
 {% endblock %}
