@@ -24,19 +24,49 @@
         data-conversation-id="{{ conversation.id }}"
         data-fetch-url="{{ url_for('whatsapp_api_conversation_messages', conversation_id=conversation.id) }}"
         data-last-id="{{ (messages|last).id if messages else 0 }}"
+        data-contact-name="{{ conversation.contact_name or conversation.contact_number|chat_display }}"
     >
         {% if messages %}
+            {% set contact_label = conversation.contact_name or conversation.contact_number|chat_display %}
             {% for message in messages %}
                 <div class="message-bubble {% if message.sender_type == 'agent' %}message-agent{% else %}message-customer{% endif %}">
                     <div class="message-meta">
                         {% if message.sender_type == 'agent' %}
-                            <span class="badge bg-primary">Agente</span>
+                            <span class="badge bg-primary">Tú</span>
                         {% else %}
-                            <span class="badge bg-success">Cliente</span>
+                            <span class="badge bg-success">{{ contact_label }}</span>
                         {% endif %}
                         <small class="text-muted">{{ message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
                     </div>
-                    <div class="message-text">{{ message.message_text | nl2br }}</div>
+                    <div class="message-content">
+                        {% if message.media_type and message.media_url %}
+                            {% if message.media_type == 'imagen' %}
+                                <a href="{{ message.media_url }}" target="_blank" rel="noopener" download class="media-link">
+                                    <img src="{{ message.media_url }}" alt="Imagen recibida" class="media-preview">
+                                </a>
+                            {% elif message.media_type == 'video' %}
+                                <video controls class="media-preview video-preview">
+                                    <source src="{{ message.media_url }}">
+                                    Tu navegador no soporta video.
+                                </video>
+                                <div><a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar video</a></div>
+                            {% elif message.media_type == 'audio' %}
+                                <audio controls class="audio-player">
+                                    <source src="{{ message.media_url }}">
+                                    Tu navegador no soporta audio.
+                                </audio>
+                                <div><a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
+                            {% else %}
+                                <div class="attachment-chip">
+                                    <i class="fas fa-paperclip"></i>
+                                    <a href="{{ message.media_url }}" target="_blank" rel="noopener" download>Descargar archivo</a>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                        {% if message.message_text %}
+                            <div class="message-text">{{ message.message_text | nl2br }}</div>
+                        {% endif %}
+                    </div>
                 </div>
             {% endfor %}
         {% else %}
@@ -68,6 +98,62 @@
     const fetchUrl = thread.dataset.fetchUrl;
     let lastId = Number(thread.dataset.lastId || 0);
     const updatedLabel = document.getElementById("conversation-updated");
+    const contactLabel = thread.dataset.contactName || "Cliente";
+
+    function buildMediaContent(container, msg) {
+        if (msg.media_type && msg.media_url) {
+            const mediaWrapper = document.createElement("div");
+            mediaWrapper.className = "message-media";
+
+            switch (msg.media_type) {
+                case "imagen":
+                    const imgLink = document.createElement("a");
+                    imgLink.href = msg.media_url;
+                    imgLink.target = "_blank";
+                    imgLink.rel = "noopener";
+                    imgLink.download = "";
+                    const img = document.createElement("img");
+                    img.src = msg.media_url;
+                    img.alt = "Imagen recibida";
+                    img.className = "media-preview";
+                    imgLink.appendChild(img);
+                    mediaWrapper.appendChild(imgLink);
+                    break;
+                case "video":
+                    const video = document.createElement("video");
+                    video.controls = true;
+                    video.className = "media-preview video-preview";
+                    const videoSource = document.createElement("source");
+                    videoSource.src = msg.media_url;
+                    video.appendChild(videoSource);
+                    mediaWrapper.appendChild(video);
+                    const videoDownload = document.createElement("div");
+                    videoDownload.innerHTML = `<a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar video</a>`;
+                    mediaWrapper.appendChild(videoDownload);
+                    break;
+                case "audio":
+                    const audio = document.createElement("audio");
+                    audio.controls = true;
+                    audio.className = "audio-player";
+                    const audioSource = document.createElement("source");
+                    audioSource.src = msg.media_url;
+                    audio.appendChild(audioSource);
+                    mediaWrapper.appendChild(audio);
+                    const audioDownload = document.createElement("div");
+                    audioDownload.innerHTML = `<a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar audio</a>`;
+                    mediaWrapper.appendChild(audioDownload);
+                    break;
+                default:
+                    const chip = document.createElement("div");
+                    chip.className = "attachment-chip";
+                    chip.innerHTML = `<i class="fas fa-paperclip"></i> <a href="${msg.media_url}" target="_blank" rel="noopener" download>Descargar archivo</a>`;
+                    mediaWrapper.appendChild(chip);
+                    break;
+            }
+
+            container.appendChild(mediaWrapper);
+        }
+    }
 
     function appendMessage(msg) {
         const bubble = document.createElement("div");
@@ -78,7 +164,7 @@
 
         const badge = document.createElement("span");
         badge.className = "badge " + (msg.sender_type === "agent" ? "bg-primary" : "bg-success");
-        badge.textContent = msg.sender_type === "agent" ? "Agente" : "Cliente";
+        badge.textContent = msg.sender_type === "agent" ? "Tú" : contactLabel;
 
         const timestamp = document.createElement("small");
         timestamp.className = "text-muted";
@@ -88,11 +174,19 @@
         meta.appendChild(timestamp);
         bubble.appendChild(meta);
 
-        const text = document.createElement("div");
-        text.className = "message-text";
-        text.textContent = msg.message_text;
-        bubble.appendChild(text);
+        const content = document.createElement("div");
+        content.className = "message-content";
 
+        buildMediaContent(content, msg);
+
+        if (msg.message_text) {
+            const text = document.createElement("div");
+            text.className = "message-text";
+            text.textContent = msg.message_text;
+            content.appendChild(text);
+        }
+
+        bubble.appendChild(content);
         thread.appendChild(bubble);
         thread.scrollTop = thread.scrollHeight;
     }
@@ -142,4 +236,3 @@
 })();
 </script>
 {% endblock %}
-

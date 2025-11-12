@@ -181,6 +181,8 @@ class WhatsAppMessage(db.Model):
     sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     external_id = db.Column(db.String(128), index=True)
     is_read = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    media_type = db.Column(db.String(32))
+    media_url = db.Column(db.String(500))
 
     def __repr__(self):
         return f'<WhatsAppMessage {self.id} {self.sender_type}>'

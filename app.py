@@ -20,6 +20,7 @@ import os
 import threading
 import time as _time
 import requests
+from sqlalchemy import text, inspect
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -45,6 +46,16 @@ db.init_app(app)
 # Asegurar que las tablas existen (incluye las de WhatsApp)
 with app.app_context():
     db.create_all()
+    inspector = inspect(db.engine)
+    try:
+        whatsapp_columns = {col['name'] for col in inspector.get_columns('whatsapp_message')}
+        with db.engine.begin() as conn:
+            if 'media_type' not in whatsapp_columns:
+                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_type VARCHAR(32)"))
+            if 'media_url' not in whatsapp_columns:
+                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
+    except Exception:
+        pass
 
 # Variable para controlar la inicialización
 _sistema_inicializado = False
@@ -148,6 +159,8 @@ def _append_whatsapp_message(
     sent_at: datetime | None = None,
     external_id: str | None = None,
     is_read: bool = True,
+    media_type: str | None = None,
+    media_url: str | None = None,
 ) -> WhatsAppMessage:
     message = WhatsAppMessage(
         conversation_id=conversation.id,
@@ -156,6 +169,8 @@ def _append_whatsapp_message(
         sent_at=sent_at or datetime.utcnow(),
         external_id=external_id,
         is_read=is_read,
+        media_type=media_type,
+        media_url=media_url,
     )
     conversation.updated_at = datetime.utcnow()
     db.session.add(message)
@@ -168,6 +183,8 @@ def _register_incoming_whatsapp_message(
     contact_name: str | None = None,
     sent_at: datetime | None = None,
     external_id: str | None = None,
+    media_type: str | None = None,
+    media_url: str | None = None,
 ):
     conversation = _ensure_whatsapp_conversation(chat_id, contact_name, sent_at)
     _append_whatsapp_message(
@@ -177,6 +194,8 @@ def _register_incoming_whatsapp_message(
         sent_at=sent_at,
         external_id=external_id,
         is_read=False,
+        media_type=media_type,
+        media_url=media_url,
     )
 
 
@@ -185,6 +204,8 @@ def _register_outgoing_whatsapp_message(
     message_text: str,
     sent_at: datetime | None = None,
     external_id: str | None = None,
+    media_type: str | None = None,
+    media_url: str | None = None,
 ):
     conversation = _ensure_whatsapp_conversation(chat_id)
     _append_whatsapp_message(
@@ -194,6 +215,8 @@ def _register_outgoing_whatsapp_message(
         sent_at=sent_at,
         external_id=external_id,
         is_read=True,
+        media_type=media_type,
+        media_url=media_url,
     )
 
 
@@ -205,6 +228,7 @@ def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
         "contact_number": conversation.contact_number,
         "last_message_text": last.message_text if last else "",
         "last_message_sender": last.sender_type if last else None,
+        "last_media_type": last.media_type if last else None,
         "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
         "updated_at_human": conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "",
         "unread_count": conversation.unread_count(),
@@ -221,6 +245,8 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
         "sent_at": message.sent_at.isoformat() if message.sent_at else None,
         "sent_at_human": message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "",
         "is_read": message.is_read,
+        "media_type": message.media_type,
+        "media_url": message.media_url,
     }
 
 
@@ -1505,7 +1531,9 @@ def webhook_whatsapp():
                         mensaje_texto,
                         contact_name=sender_data.get('senderName'),
                         sent_at=sent_at,
-                        external_id=mensaje_data.get('idMessage', '')
+                        external_id=mensaje_data.get('idMessage', ''),
+                        media_type=tipo_mensaje if tipo_mensaje != 'texto' else None,
+                        media_url=archivo_url,
                     )
                 except Exception as exc:  # noqa: BLE001
                     print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
