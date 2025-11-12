@@ -12,6 +12,12 @@
             <div class="card-body">
                 <form method="POST">
                     <div class="mb-3">
+                        <label for="codigo" class="form-label">Código:</label>
+                        <input type="text" class="form-control" id="codigo" name="codigo" 
+                               value="{{ cliente.codigo or '' }}">
+                    </div>
+
+                    <div class="mb-3">
                         <label for="nombre" class="form-label">Nombre del Cliente:</label>
                         <input type="text" class="form-control" id="nombre" name="nombre" 
                                value="{{ cliente.nombre }}" required>
@@ -58,6 +64,7 @@
                 <div class="row">
                     <div class="col-md-6">
                         <p><strong>ID:</strong> {{ cliente.id }}</p>
+                        <p><strong>Código:</strong> {{ cliente.codigo or '—' }}</p>
                         <p><strong>Estado:</strong> 
                             {% if cliente.activo %}
                                 <span class="badge bg-success">Activo</span>

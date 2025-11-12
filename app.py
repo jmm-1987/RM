@@ -23,6 +23,7 @@ import requests
 from sqlalchemy import text, inspect
 from werkzeug.utils import secure_filename
 import base64
+import io
 
 app = Flask(__name__)
 
@@ -55,6 +56,13 @@ with app.app_context():
                 conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_type VARCHAR(32)"))
             if 'media_url' not in whatsapp_columns:
                 conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
+    except Exception:
+        pass
+    try:
+        cliente_columns = {col['name'] for col in inspector.get_columns('cliente')}
+        if 'codigo' not in cliente_columns:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cliente ADD COLUMN codigo VARCHAR(50)"))
     except Exception:
         pass
 
@@ -583,13 +591,34 @@ def index():
 @app.route('/clientes')
 def clientes():
     zona_id = request.args.get('zona_id', type=int)
+    mostrar_inactivos = request.args.get('mostrar_inactivos', '').lower() in {'1', 'true', 'on'}
+    filtro_codigo = (request.args.get('codigo') or '').strip()
+    filtro_nombre = (request.args.get('nombre') or '').strip()
+
+    query = Cliente.query
     if zona_id:
-        clientes = Cliente.query.filter_by(zona_id=zona_id, activo=True).all()
-    else:
-        clientes = Cliente.query.filter_by(activo=True).all()
+        query = query.filter_by(zona_id=zona_id)
+    if not mostrar_inactivos:
+        query = query.filter_by(activo=True)
+
+    if filtro_codigo:
+        query = query.filter(Cliente.codigo.ilike(f"%{filtro_codigo}%"))
+
+    if filtro_nombre:
+        query = query.filter(Cliente.nombre.ilike(f"%{filtro_nombre}%"))
+
+    clientes = query.order_by(Cliente.nombre.asc()).all()
     
     zonas = Zona.query.all()
-    return render_template('clientes.html', clientes=clientes, zonas=zonas, zona_seleccionada=zona_id)
+    return render_template(
+        'clientes.html',
+        clientes=clientes,
+        zonas=zonas,
+        zona_seleccionada=zona_id,
+        mostrar_inactivos=mostrar_inactivos,
+        filtro_codigo=filtro_codigo,
+        filtro_nombre=filtro_nombre
+    )
 
 
 @app.route('/clientes/importar', methods=['POST'])
@@ -606,30 +635,104 @@ def importar_clientes():
             flash('Pandas no está instalado en el entorno. Solicita al administrador que añada pandas al proyecto.', 'error')
             return redirect(url_for('clientes'))
 
-        df = pd.read_excel(file, engine='openpyxl')
+        filename = secure_filename(file.filename)
+        ext = os.path.splitext(filename)[1].lower()
 
-        columnas_esperadas = ["Codigo", "Nombre", "Teléfono", "Email", "Dirección", "Población", "Zona"]
-        if list(df.columns)[:len(columnas_esperadas)] != columnas_esperadas:
+        excel_data = file.read()
+
+        read_kwargs = {'dtype': str, 'engine': 'openpyxl'} if ext == '.xlsx' else {'dtype': str}
+
+        if ext == '.xlsx':
+            df = pd.read_excel(io.BytesIO(excel_data), **read_kwargs)
+        elif ext == '.xls':
+            try:
+                df = pd.read_excel(io.BytesIO(excel_data), dtype=str, engine='xlrd')
+            except ImportError:
+                df = pd.read_excel(io.BytesIO(excel_data), dtype=str)
+        else:
+            flash('Formato de archivo no soportado. Usa .xlsx o .xls', 'error')
+            return redirect(url_for('clientes'))
+
+        def normalize(text: str) -> str:
+            replacements = {
+                'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+                'Á': 'a', 'É': 'e', 'Í': 'i', 'Ó': 'o', 'Ú': 'u',
+            }
+            clean = ''.join(replacements.get(ch, ch) for ch in text)
+            clean = ''.join(ch for ch in clean if ch.isalnum())
+            return clean.lower()
+
+        header_map = {
+            'codigo': 'Codigo',
+            'codigocliente': 'Codigo',
+            'codigoid': 'Codigo',
+            'código': 'Codigo',
+            'códigocliente': 'Codigo',
+            'denominacion': 'Nombre',
+            'nombre': 'Nombre',
+            'nombrefiscal': 'Nombre',
+            'telefono': 'Teléfono',
+            'teléfono': 'Teléfono',
+            'telefonocontacto': 'Teléfono',
+            'email': 'Email',
+            'correo': 'Email',
+            'correoelectronico': 'Email',
+            'direccion': 'Dirección',
+            'dirección': 'Dirección',
+            'domicilio': 'Dirección',
+            'poblacion': 'Población',
+            'población': 'Población',
+            'localidad': 'Población',
+            'zona': 'Zona',
+        }
+
+        columnas_objetivo = ["Codigo", "Nombre", "Teléfono", "Email", "Dirección", "Población", "Zona"]
+        renombradas = {}
+        for col in df.columns:
+            key = normalize(str(col))
+            destino = header_map.get(key)
+            if destino:
+                renombradas[col] = destino
+
+        df = df.rename(columns=renombradas)
+
+        if not all(col in df.columns for col in columnas_objetivo):
             flash('Las columnas del Excel no coinciden con el formato esperado.', 'error')
             return redirect(url_for('clientes'))
 
         registros = []
+        filas_invalidas = []
         zonas_cache = {zona.nombre.strip().lower(): zona for zona in Zona.query.all()}
 
+        def clean(value):
+            if value is None:
+                return None
+            text = str(value).strip()
+            if not text or text.lower() in {'nan', 'none'}:
+                return None
+            return text
+
         for _, row in df.iterrows():
-            codigo = str(row["Codigo"]).strip() if not pd.isna(row["Codigo"]) else None
-            nombre = str(row["Nombre"]).strip() if not pd.isna(row["Nombre"]) else None
-            telefono = str(row["Teléfono"]).strip() if not pd.isna(row["Teléfono"]) else None
-            telefono = ''.join(filter(str.isdigit, telefono)) if telefono else None
+            codigo = clean(row.get("Codigo"))
+            nombre = clean(row.get("Nombre"))
+            telefono_raw = clean(row.get("Teléfono"))
+            if not codigo and not nombre and not telefono_raw:
+                continue
+            telefono = ''.join(filter(str.isdigit, telefono_raw)) if telefono_raw else None
 
             if not codigo or not nombre or not telefono:
-                flash('Los campos Código, Nombre y Teléfono son obligatorios en todas las filas.', 'error')
-                return redirect(url_for('clientes'))
+                filas_invalidas.append({
+                    'fila_excel': row.name + 2,
+                    'codigo': codigo or '',
+                    'nombre': nombre or '',
+                    'telefono': telefono_raw or ''
+                })
+                continue
 
-            email = None if pd.isna(row["Email"]) else str(row["Email"]).strip()
-            direccion = None if pd.isna(row["Dirección"]) else str(row["Dirección"]).strip()
-            poblacion = None if pd.isna(row["Población"]) else str(row["Población"]).strip()
-            zona_nombre = None if pd.isna(row["Zona"]) else str(row["Zona"]).strip()
+            email = clean(row.get("Email"))
+            direccion = clean(row.get("Dirección"))
+            poblacion = clean(row.get("Población"))
+            zona_nombre = clean(row.get("Zona"))
 
             zona_id = None
             if zona_nombre:
@@ -664,6 +767,7 @@ def importar_clientes():
 
         for data in registros:
             cliente = Cliente(
+                codigo=data['codigo'],
                 nombre=data['nombre'],
                 telefono=data['telefono'],
                 email=data['email'],
@@ -676,7 +780,19 @@ def importar_clientes():
             db.session.add(cliente)
 
         db.session.commit()
-        flash(f'Se importaron {len(registros)} clientes correctamente.', 'success')
+        if filas_invalidas:
+            detalles = '; '.join(
+                f"fila {item['fila_excel']} (Código: {item['codigo']}, Nombre: {item['nombre']}, Teléfono original: {item['telefono']})"
+                for item in filas_invalidas[:5]
+            )
+            if len(filas_invalidas) > 5:
+                detalles += f"; … y {len(filas_invalidas) - 5} fila(s) más"
+            flash(
+                f'Se importaron {len(registros)} clientes. Se omitieron {len(filas_invalidas)} fila(s) sin datos obligatorios: {detalles}',
+                'warning'
+            )
+        else:
+            flash(f'Se importaron {len(registros)} clientes correctamente.', 'success')
 
     except Exception as e:
         db.session.rollback()
@@ -689,6 +805,7 @@ def editar_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
     
     if request.method == 'POST':
+        cliente.codigo = request.form.get('codigo', '').strip() or None
         cliente.nombre = request.form.get('nombre')
         cliente.telefono = request.form.get('telefono')
         cliente.zona_id = request.form.get('zona_id', type=int)
@@ -708,6 +825,39 @@ def editar_cliente(cliente_id):
     
     zonas = Zona.query.all()
     return render_template('editar_cliente.html', cliente=cliente, zonas=zonas)
+
+
+@app.post('/clientes/<int:cliente_id>/toggle')
+def toggle_cliente(cliente_id):
+    cliente = Cliente.query.get_or_404(cliente_id)
+    field = request.form.get('field')
+    next_url = request.form.get('next') or request.referrer or url_for('clientes')
+
+    if field == 'incluir':
+        cliente.incluir = not cliente.incluir
+        mensaje = f"Cliente {cliente.nombre} {'incluido' if cliente.incluir else 'excluido'} correctamente."
+        categoria = 'success'
+    elif field == 'activo':
+        cliente.activo = not cliente.activo
+        if not cliente.activo:
+            cliente.incluir = False
+            mensaje = f"Cliente {cliente.nombre} marcado como inactivo y excluido de envíos."
+            categoria = 'warning'
+        else:
+            mensaje = f"Cliente {cliente.nombre} marcado como activo."
+            categoria = 'success'
+    else:
+        flash('Acción no válida.', 'error')
+        return redirect(next_url)
+
+    try:
+        db.session.commit()
+        flash(mensaje, categoria)
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error actualizando cliente: {str(e)}', 'error')
+
+    return redirect(next_url)
 
 @app.route('/clientes/eliminar/<int:cliente_id>', methods=['POST'])
 def eliminar_cliente(cliente_id):
