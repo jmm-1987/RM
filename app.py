@@ -621,6 +621,50 @@ def clientes():
     )
 
 
+@app.route('/clientes/nuevo', methods=['GET', 'POST'])
+def nuevo_cliente():
+    zonas = Zona.query.all()
+
+    if request.method == 'POST':
+        codigo = request.form.get('codigo', '').strip() or None
+        nombre = (request.form.get('nombre') or '').strip()
+        telefono = (request.form.get('telefono') or '').strip()
+        zona_id = request.form.get('zona_id', type=int)
+        email = (request.form.get('email') or '').strip() or None
+        direccion = (request.form.get('direccion') or '').strip() or None
+        poblacion = (request.form.get('poblacion') or '').strip() or None
+
+        telefono = ''.join(filter(str.isdigit, telefono)) if telefono else None
+
+        if not nombre or not telefono or not zona_id:
+            flash('Nombre, teléfono y zona son obligatorios.', 'error')
+            return redirect(url_for('nuevo_cliente'))
+
+        cliente = Cliente(
+            codigo=codigo,
+            nombre=nombre,
+            telefono=telefono,
+            zona_id=zona_id,
+            email=email,
+            direccion=direccion,
+            poblacion=poblacion,
+            activo=True,
+            incluir=True
+        )
+
+        try:
+            db.session.add(cliente)
+            db.session.commit()
+            flash('Cliente creado correctamente.', 'success')
+            return redirect(url_for('clientes'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creando cliente: {str(e)}', 'error')
+            return redirect(url_for('nuevo_cliente'))
+
+    return render_template('nuevo_cliente.html', zonas=zonas)
+
+
 @app.route('/clientes/importar', methods=['POST'])
 def importar_clientes():
     file = request.files.get('archivo_clientes')
@@ -1000,6 +1044,31 @@ def actualizar_plantillas_con_enlace():
 def mensajes():
     plantillas = MensajePlantilla.query.filter_by(activo=True).all()
     return render_template('mensajes.html', plantillas=plantillas)
+
+
+@app.route('/mensajes/nuevo', methods=['GET', 'POST'])
+def nueva_plantilla():
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre') or '').strip()
+        contenido = (request.form.get('contenido') or '').strip()
+
+        if not nombre or not contenido:
+            flash('El nombre y el contenido de la plantilla son obligatorios.', 'error')
+            return redirect(url_for('nueva_plantilla'))
+
+        plantilla = MensajePlantilla(nombre=nombre, contenido=contenido, activo=True)
+
+        try:
+            db.session.add(plantilla)
+            db.session.commit()
+            flash('Plantilla creada correctamente.', 'success')
+            return redirect(url_for('mensajes'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creando plantilla: {str(e)}', 'error')
+            return redirect(url_for('nueva_plantilla'))
+
+    return render_template('nueva_plantilla.html')
 
 @app.route('/enviar_masivo', methods=['GET', 'POST'])
 def enviar_masivo():
