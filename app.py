@@ -124,9 +124,15 @@ def _fetch_green_api_contacts() -> list[dict]:
     response = requests.get(url, timeout=30)
     response.raise_for_status()
     data = response.json()
-    contacts = data.get("contacts") if isinstance(data, dict) else None
+    if isinstance(data, dict):
+        contacts = data.get("contacts") or data.get("result")
+    elif isinstance(data, list):
+        contacts = data
+    else:
+        contacts = None
+
     if contacts is None:
-        raise ValueError("Respuesta inesperada al solicitar contactos en Green-API")
+        raise ValueError(f"Respuesta inesperada al solicitar contactos en Green-API: {data}")
     return contacts
 
 

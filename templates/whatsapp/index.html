@@ -16,6 +16,9 @@
         <a href="{{ url_for('whatsapp_new_conversation') }}" class="btn btn-success">
             <i class="fas fa-plus"></i> Nueva conversación
         </a>
+        <button class="btn btn-outline-success" type="button" id="refresh-conversations">
+            <i class="fas fa-sync-alt"></i> Refrescar
+        </button>
         <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#contactsModal">
             <i class="fas fa-address-book"></i> Contactos
         </button>
@@ -205,6 +208,12 @@
     }
 
     setInterval(fetchConversations, 5000);
+    const refreshBtn = document.getElementById("refresh-conversations");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => {
+            fetchConversations();
+        });
+    }
 
     const contactsModal = document.getElementById("contactsModal");
     if (!contactsModal) {
@@ -218,6 +227,17 @@
 
     function renderContacts(contacts) {
         contactsTableBody.innerHTML = "";
+
+        if (!contacts.length) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 4;
+            cell.className = "text-center text-muted";
+            cell.textContent = "No hay contactos disponibles en la agenda de Green API.";
+            row.appendChild(cell);
+            contactsTableBody.appendChild(row);
+            return;
+        }
 
         contacts.forEach((contact) => {
             const row = document.createElement("tr");
