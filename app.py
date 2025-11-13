@@ -585,6 +585,14 @@ def inicializar_sistema():
         else:
             print("✅ Sistema ya inicializado")
         
+        # Asegurar que todos los clientes tengan incluir=True (campo reservado para futuro)
+        clientes_sin_incluir = Cliente.query.filter_by(incluir=False).all()
+        if clientes_sin_incluir:
+            for cliente in clientes_sin_incluir:
+                cliente.incluir = True
+            db.session.commit()
+            print(f"✅ Actualizados {len(clientes_sin_incluir)} clientes para tener incluir=True")
+        
         _sistema_inicializado = True
             
     except Exception as e:
@@ -642,15 +650,25 @@ def index():
 @app.route('/clientes')
 def clientes():
     zona_id = request.args.get('zona_id', type=int)
+    filtro_estado = request.args.get('filtro_estado', 'activos')  # 'activos', 'todos', 'inactivos'
+    # Mantener compatibilidad con el parámetro antiguo
     mostrar_inactivos = request.args.get('mostrar_inactivos', '').lower() in {'1', 'true', 'on'}
+    if mostrar_inactivos and filtro_estado == 'activos':
+        filtro_estado = 'todos'
+    
     filtro_codigo = (request.args.get('codigo') or '').strip()
     filtro_nombre = (request.args.get('nombre') or '').strip()
 
     query = Cliente.query
     if zona_id:
         query = query.filter_by(zona_id=zona_id)
-    if not mostrar_inactivos:
+    
+    # Aplicar filtro de estado
+    if filtro_estado == 'activos':
         query = query.filter_by(activo=True)
+    elif filtro_estado == 'inactivos':
+        query = query.filter_by(activo=False)
+    # Si es 'todos', no aplicamos filtro de activo
 
     if filtro_codigo:
         query = query.filter(Cliente.codigo.ilike(f"%{filtro_codigo}%"))
@@ -666,7 +684,7 @@ def clientes():
         clientes=clientes,
         zonas=zonas,
         zona_seleccionada=zona_id,
-        mostrar_inactivos=mostrar_inactivos,
+        filtro_estado=filtro_estado,
         filtro_codigo=filtro_codigo,
         filtro_nombre=filtro_nombre
     )
@@ -928,15 +946,12 @@ def toggle_cliente(cliente_id):
     field = request.form.get('field')
     next_url = request.form.get('next') or request.referrer or url_for('clientes')
 
-    if field == 'incluir':
-        cliente.incluir = not cliente.incluir
-        mensaje = f"Cliente {cliente.nombre} {'incluido' if cliente.incluir else 'excluido'} correctamente."
-        categoria = 'success'
-    elif field == 'activo':
+    if field == 'activo':
         cliente.activo = not cliente.activo
+        # Asegurar que incluir siempre sea True (campo reservado para futuro)
+        cliente.incluir = True
         if not cliente.activo:
-            cliente.incluir = False
-            mensaje = f"Cliente {cliente.nombre} marcado como inactivo y excluido de envíos."
+            mensaje = f"Cliente {cliente.nombre} marcado como inactivo."
             categoria = 'warning'
         else:
             mensaje = f"Cliente {cliente.nombre} marcado como activo."

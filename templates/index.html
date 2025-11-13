@@ -9,6 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet CSS para el mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
             font-family: 'Poppins', 'Montserrat', sans-serif;
@@ -468,6 +470,30 @@
             color: #212529 !important;
         }
         
+        /* Estilos para la sección de contacto con fondo claro */
+        #contacto.bg-light,
+        #contacto.bg-light h2,
+        #contacto.bg-light h5,
+        #contacto.bg-light p,
+        #contacto.bg-light .card,
+        #contacto.bg-light .card-body,
+        #contacto.bg-light .card-title,
+        #contacto.bg-light .card-text,
+        #contacto.bg-light strong,
+        #contacto.bg-light a:not(.text-success) {
+            color: #212529 !important;
+        }
+        
+        #contacto.bg-light .card {
+            background: #ffffff !important;
+            color: #212529 !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+        }
+        
+        #contacto.bg-light .text-muted {
+            color: #6c757d !important;
+        }
+        
         .text-muted {
             color: rgba(255, 255, 255, 0.7) !important;
         }
@@ -586,6 +612,25 @@
         .brands-title p {
             color: rgba(255, 255, 255, 0.7);
             font-size: 1.1rem;
+        }
+        
+        /* Estilos para el mapa */
+        #map {
+            border-radius: 0 0 0.375rem 0.375rem;
+            z-index: 1;
+        }
+        
+        .leaflet-container {
+            background-color: #1a1a1a;
+        }
+        
+        .custom-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -822,51 +867,201 @@
         </div>
     </section>
 
-    <!-- Contacto -->
-    <section id="contacto" class="py-5 section-dark">
+    <!-- Sección de Servicios -->
+    <section class="py-5 section-dark">
         <div class="container">
             <div class="row">
-                <div class="col-12">
-                    <h2 class="text-center mb-5">
-                        <i class="fas fa-phone"></i> Contacto
+                <div class="col-12 text-center mb-5">
+                    <h2 class="display-5 fw-bold mb-3">
+                        <i class="fas fa-cogs text-primary"></i> Nuestros Servicios
                     </h2>
+                    <p class="lead">Soluciones completas para tus necesidades de recambios</p>
                 </div>
             </div>
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
                         <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-map-marker-alt text-primary"></i> Información de Contacto
-                            </h5>
+                            <div class="mb-3">
+                                <i class="fas fa-shipping-fast fa-4x text-primary"></i>
+                            </div>
+                            <h4 class="card-title">Distribución Rápida</h4>
                             <p class="card-text">
-                                <strong>Recambios RM</strong><br>
-                                Distribución de Recambios<br>
-                                Madrid, España<br><br>
-                                <i class="fas fa-phone"></i> +34 900 123 456<br>
-                                <i class="fas fa-envelope"></i> info@recambiosrm.com<br>
-                                <i class="fas fa-clock"></i> Lunes a Viernes: 8:00 - 18:00
+                                Entregas en 24-48 horas en toda la zona metropolitana. 
+                                Servicio de urgencia disponible para pedidos prioritarios.
                             </p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="card">
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
                         <div class="card-body">
-                            <h5 class="card-title">
+                            <div class="mb-3">
+                                <i class="fas fa-tools fa-4x text-success"></i>
+                            </div>
+                            <h4 class="card-title">Asesoramiento Técnico</h4>
+                            <p class="card-text">
+                                Nuestro equipo de expertos te ayuda a encontrar el recambio 
+                                perfecto para tu vehículo con garantía de compatibilidad.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="fas fa-shield-alt fa-4x text-warning"></i>
+                            </div>
+                            <h4 class="card-title">Garantía de Calidad</h4>
+                            <p class="card-text">
+                                Todos nuestros productos cuentan con garantía oficial. 
+                                Trabajamos solo con marcas reconocidas y certificadas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="fas fa-warehouse fa-4x text-info"></i>
+                            </div>
+                            <h4 class="card-title">Stock Amplio</h4>
+                            <p class="card-text">
+                                Más de 10.000 referencias en stock permanente. 
+                                Si no lo tenemos, te lo conseguimos en el menor tiempo posible.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="fas fa-euro-sign fa-4x text-danger"></i>
+                            </div>
+                            <h4 class="card-title">Precios Competitivos</h4>
+                            <p class="card-text">
+                                Los mejores precios del mercado sin comprometer la calidad. 
+                                Descuentos especiales para pedidos al por mayor.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 text-center">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <i class="fas fa-headset fa-4x text-primary"></i>
+                            </div>
+                            <h4 class="card-title">Atención Personalizada</h4>
+                            <p class="card-text">
+                                Servicio de atención al cliente disponible de lunes a viernes. 
+                                Resolvemos tus dudas de forma rápida y eficiente.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Información de Contacto y Mapa -->
+    <section id="contacto" class="py-5 bg-light">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-center mb-5">
+                        <i class="fas fa-map-marker-alt text-primary"></i> Contacto y Ubicación
+                    </h2>
+                </div>
+            </div>
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">
+                                <i class="fas fa-phone text-primary"></i> Información de Contacto
+                            </h5>
+                            <p class="card-text">
+                                <strong><i class="fas fa-building me-2"></i>Recambios RM</strong><br>
+                                Distribución de Recambios de Automoción<br><br>
+                                
+                                <strong><i class="fas fa-phone me-2"></i>Teléfono:</strong><br>
+                                <a href="tel:+34900123456" class="text-decoration-none">+34 900 123 456</a><br><br>
+                                
+                                <strong><i class="fas fa-mobile-alt me-2"></i>WhatsApp:</strong><br>
+                                <a href="https://wa.me/34605360115" target="_blank" class="text-decoration-none text-success">
+                                    <i class="fab fa-whatsapp"></i> +34 605 360 115
+                                </a><br><br>
+                                
+                                <strong><i class="fas fa-envelope me-2"></i>Email:</strong><br>
+                                <a href="mailto:info@recambiosrm.com" class="text-decoration-none">info@recambiosrm.com</a><br><br>
+                                
+                                <strong><i class="fas fa-clock me-2"></i>Horario de Atención:</strong><br>
+                                Lunes - Viernes: 8:00 - 18:00<br>
+                                Sábados: 9:00 - 14:00<br>
+                                Domingos: Cerrado
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">
                                 <i class="fas fa-truck text-success"></i> Zonas de Reparto
                             </h5>
                             <p class="card-text">
-                                Realizamos entregas en las siguientes zonas:<br>
-                                • Zona1 - Centro<br>
-                                • Zona2 - Norte<br>
-                                • Zona3 - Sur<br>
-                                • Zona4 - Este<br>
-                                • Zona5 - Oeste<br>
-                                • Zona6 - Polígono Industrial<br>
-                                • Zona7 - Residencial<br>
-                                • Zona8 - Carretera Nacional
+                                Realizamos entregas en las siguientes zonas:<br><br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Centro de Madrid<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Zona Norte<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Zona Sur<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Zona Este<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Zona Oeste<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Polígonos Industriales<br>
+                                <i class="fas fa-check-circle text-success me-2"></i>Área Metropolitana<br><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Consulta disponibilidad para otras zonas
+                                </small>
                             </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">
+                                <i class="fas fa-info-circle text-info"></i> Sobre Nosotros
+                            </h5>
+                            <p class="card-text">
+                                <strong>Recambios RM</strong> es una empresa especializada en la 
+                                distribución de recambios de automoción con más de 15 años de experiencia 
+                                en el sector.<br><br>
+                                
+                                Nos caracterizamos por:<br>
+                                <i class="fas fa-star text-warning me-2"></i>Calidad garantizada<br>
+                                <i class="fas fa-star text-warning me-2"></i>Servicio rápido y eficiente<br>
+                                <i class="fas fa-star text-warning me-2"></i>Atención personalizada<br>
+                                <i class="fas fa-star text-warning me-2"></i>Precios competitivos<br>
+                                <i class="fas fa-star text-warning me-2"></i>Amplio catálogo de productos
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mapa -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <h5 class="card-title p-3 mb-0">
+                                <i class="fas fa-map-marked-alt text-primary"></i> Nuestra Ubicación
+                            </h5>
+                            <div id="map" style="height: 450px; width: 100%; border-radius: 0 0 0.375rem 0.375rem;"></div>
                         </div>
                     </div>
                 </div>
@@ -893,7 +1088,71 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Leaflet JS para el mapa -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // Inicializar mapa con Leaflet (OpenStreetMap)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Coordenadas de Madrid (puedes cambiarlas por la ubicación real)
+            const ubicacion = [40.4168, -3.7038];
+            
+            // Crear el mapa
+            const map = L.map('map').setView(ubicacion, 13);
+            
+            // Añadir capa de OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Crear icono personalizado
+            const iconoPersonalizado = L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        background-color: #25D366;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        border: 3px solid white;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                    ">
+                        <i class="fas fa-map-marker-alt" style="color: white; font-size: 20px;"></i>
+                    </div>
+                `,
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -40]
+            });
+            
+            // Añadir marcador
+            const marker = L.marker(ubicacion, { icon: iconoPersonalizado }).addTo(map);
+            
+            // Añadir popup con información
+            marker.bindPopup(`
+                <div style="color: #000; padding: 5px; min-width: 200px;">
+                    <h5 style="margin: 0 0 10px 0; color: #25D366;">
+                        <i class="fas fa-map-marker-alt"></i> Recambios RM
+                    </h5>
+                    <p style="margin: 5px 0; font-size: 14px;">
+                        <strong>Dirección:</strong><br>
+                        Madrid, España
+                    </p>
+                    <p style="margin: 5px 0; font-size: 14px;">
+                        <strong>Teléfono:</strong><br>
+                        <a href="tel:+34900123456">+34 900 123 456</a>
+                    </p>
+                    <p style="margin: 5px 0; font-size: 14px;">
+                        <strong>Horario:</strong><br>
+                        Lunes - Viernes: 8:00 - 18:00
+                    </p>
+                </div>
+            `).openPopup();
+        });
+        
         function whatsappPedido(titulo) {
             const telefono = '34605360115'; // +34 605360115
             const mensaje = `Hola, estoy interesado en la oferta: ${titulo}. ¿Me podéis confirmar disponibilidad y cómo pedirla?`;
