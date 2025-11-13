@@ -1782,6 +1782,14 @@ def webhook_whatsapp():
             # Buscar si el remitente es un cliente existente
             cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
             
+            # Obtener chat_id_full antes de usarlo
+            chat_id_full = sender_data.get('chatId') or sender_data.get('sender')
+            if not chat_id_full and telefono_remitente:
+                try:
+                    chat_id_full = _normalize_chat_id(telefono_remitente)
+                except ValueError:
+                    chat_id_full = ''
+            
             # Crear registro del mensaje recibido
             chat_display_name = sender_data.get('chatName') or sender_data.get('senderName') or chat_id_full or telefono_remitente
 
@@ -1798,12 +1806,6 @@ def webhook_whatsapp():
             db.session.add(mensaje_recibido)
 
             # Registrar en conversaciones avanzadas
-            chat_id_full = sender_data.get('chatId') or sender_data.get('sender')
-            if not chat_id_full and telefono_remitente:
-                try:
-                    chat_id_full = _normalize_chat_id(telefono_remitente)
-                except ValueError:
-                    chat_id_full = ''
 
             if chat_id_full:
                 timestamp = mensaje_data.get('timestamp') or message_data.get('timestamp') or data.get('timestamp')
