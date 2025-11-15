@@ -396,7 +396,8 @@ def _register_outgoing_whatsapp_message(
 def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
     last = conversation.last_message()
     last_usuario = None
-    if last and last.usuario:
+    # Solo incluir usuario si el último mensaje es de un agente (no del cliente)
+    if last and last.sender_type == 'agent' and last.usuario:
         last_usuario = {
             "id": last.usuario.id,
             "username": last.usuario.username,
