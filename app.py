@@ -51,14 +51,22 @@ if os.environ.get('RENDER'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
-    'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
-    'connect_args': {
-        'connect_timeout': 10,
-        'sslmode': 'require' if 'postgresql' in database_url else None
+
+# Configuración del engine para PostgreSQL
+if 'postgresql' in database_url:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
+        'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
+        'connect_args': {
+            'sslmode': 'require'
+        }
     }
-}
+else:
+    # Para SQLite, configuración mínima
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+    }
+
 app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Configuración común
