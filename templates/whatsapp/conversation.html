@@ -18,7 +18,7 @@
     <div class="card-header">
         <h2 class="h5 mb-0">{{ conversation.contact_name or conversation.contact_number|chat_display }}</h2>
         <small class="text-muted" id="conversation-updated">
-            Última actualización: {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
+            Última actualización: {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
         </small>
     </div>
     <div
@@ -45,7 +45,7 @@
                         {% else %}
                             <span class="badge bg-success">{{ contact_label }}</span>
                         {% endif %}
-                        <small class="text-muted">{{ message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
+                        <small class="text-muted">{{ (message.sent_at | local_time).strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
                     </div>
                     <div class="message-content">
                         {% if message.media_type %}

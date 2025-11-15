@@ -207,6 +207,18 @@ except Exception:
 def _now():
     return datetime.now(_scheduler_tz)
 
+def _to_local_time(utc_dt: datetime | None) -> datetime | None:
+    """Convierte una fecha UTC a la zona horaria del scheduler (Europe/Madrid por defecto)"""
+    if utc_dt is None:
+        return None
+    if utc_dt.tzinfo is None:
+        # Si no tiene timezone, asumir que es UTC
+        utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+    elif utc_dt.tzinfo != timezone.utc:
+        # Si tiene otro timezone, convertir a UTC primero
+        utc_dt = utc_dt.astimezone(timezone.utc)
+    return utc_dt.astimezone(_scheduler_tz)
+
 
 class _FormatoSeguro(UserDict):
     """Permite usar str.format_map sin lanzar KeyError cuando faltan llaves."""
@@ -309,7 +321,7 @@ def _ensure_whatsapp_conversation(chat_id: str, contact_name: str | None = None,
             if cleaned_name and cleaned_name != conversation.contact_name:
                 conversation.contact_name = cleaned_name
 
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = datetime.now(timezone.utc)
     return conversation
 
 
@@ -328,14 +340,14 @@ def _append_whatsapp_message(
         conversation_id=conversation.id,
         sender_type=sender_type,
         message_text=message_text,
-        sent_at=sent_at or datetime.utcnow(),
+        sent_at=(sent_at.replace(tzinfo=timezone.utc) if sent_at and sent_at.tzinfo is None else sent_at) or datetime.now(timezone.utc),
         external_id=external_id,
         is_read=is_read,
         media_type=media_type,
         media_url=media_url,
         usuario_id=usuario_id if sender_type == 'agent' else None,
     )
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = datetime.now(timezone.utc)
     db.session.add(message)
     return message
 
@@ -414,7 +426,7 @@ def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
         "last_media_type": last.media_type if last else None,
         "last_usuario": last_usuario,
         "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
-        "updated_at_human": conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "",
+        "updated_at_human": _to_local_time(conversation.updated_at).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "",
         "unread_count": conversation.unread_count(),
         "url": url_for("whatsapp_conversation_detail", conversation_id=conversation.id),
     }
@@ -439,7 +451,7 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
         "sender_type": message.sender_type,
         "message_text": message.message_text,
         "sent_at": message.sent_at.isoformat() if message.sent_at else None,
-        "sent_at_human": message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "",
+        "sent_at_human": _to_local_time(message.sent_at).strftime("%d/%m/%Y %H:%M") if message.sent_at else "",
         "is_read": message.is_read,
         "media_type": message.media_type,
         "media_url": message.media_url,
@@ -459,6 +471,11 @@ def nl2br_filter(value: str | None) -> Markup:
 @app.template_filter("chat_display")
 def chat_display_filter(value: str | None) -> str:
     return _chat_display(value)
+
+@app.template_filter("local_time")
+def local_time_filter(utc_dt: datetime | None) -> datetime | None:
+    """Filtro de template para convertir fechas UTC a la zona horaria local"""
+    return _to_local_time(utc_dt)
 
 
 def _ejecutor_programaciones():
@@ -2182,38 +2199,52 @@ def webhook_whatsapp():
                     mensaje_texto = '[Imagen]'
                 # Si no hay downloadUrl, el external_id se usará para descargar después
             elif 'fileMessageData' in message_data:
-                # Green-API puede enviar imágenes como fileMessageData con typeMessage='image'
+                # Green-API puede enviar diferentes tipos de media como fileMessageData
                 file_data = message_data.get('fileMessageData', {})
-                # Verificar el tipo de mensaje
+                # Verificar el tipo de mensaje según typeMessage
                 if type_message == 'image':
                     mensaje_texto = file_data.get('caption', '') or ''
                     tipo_mensaje = 'imagen'
                     print(f"📷 Imagen recibida (fileMessageData) - typeMessage: 'image'")
+                    if not mensaje_texto:
+                        mensaje_texto = '[Imagen]'
+                elif type_message == 'video':
+                    mensaje_texto = file_data.get('caption', '') or ''
+                    tipo_mensaje = 'video'
+                    print(f"🎥 Video recibido (fileMessageData) - typeMessage: 'video'")
+                    if not mensaje_texto:
+                        mensaje_texto = '[Video]'
+                elif type_message == 'audio' or type_message == 'ptt':  # ptt = push-to-talk (nota de voz)
+                    mensaje_texto = ''
+                    tipo_mensaje = 'audio'
+                    print(f"🎵 Audio recibido (fileMessageData) - typeMessage: '{type_message}'")
+                    mensaje_texto = '[Audio]'
                 else:
-                    mensaje_texto = file_data.get('caption', '') or '[Archivo]'
+                    mensaje_texto = file_data.get('caption', '') or ''
                     tipo_mensaje = 'documento'  # Por defecto, tratar como documento
                     print(f"📎 Archivo recibido (fileMessageData) - typeMessage: '{type_message}'")
+                    if not mensaje_texto:
+                        mensaje_texto = '[Archivo]'
                 
                 # Intentar obtener downloadUrl
                 archivo_url = file_data.get('downloadUrl', '')
                 # Obtener idMessage desde diferentes ubicaciones posibles
                 id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
                 print(f"📎 fileMessageData - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
-                # Si no hay caption y es imagen, usar placeholder
-                if tipo_mensaje == 'imagen' and not mensaje_texto:
-                    mensaje_texto = '[Imagen]'
             elif 'documentMessageData' in message_data:
                 mensaje_texto = message_data['documentMessageData'].get('caption', '')
                 tipo_mensaje = 'documento'
                 archivo_url = message_data['documentMessageData'].get('downloadUrl', '')
             elif 'audioMessageData' in message_data:
-                mensaje_texto = '[Mensaje de audio]'
+                mensaje_texto = '[Audio]'
                 tipo_mensaje = 'audio'
                 archivo_url = message_data['audioMessageData'].get('downloadUrl', '')
             elif 'videoMessageData' in message_data:
-                mensaje_texto = message_data['videoMessageData'].get('caption', '')
+                mensaje_texto = message_data['videoMessageData'].get('caption', '') or ''
                 tipo_mensaje = 'video'
                 archivo_url = message_data['videoMessageData'].get('downloadUrl', '')
+                if not mensaje_texto:
+                    mensaje_texto = '[Video]'
             
             # Buscar si el remitente es un cliente existente
             cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
@@ -2251,7 +2282,7 @@ def webhook_whatsapp():
                     except Exception:
                         sent_at = datetime.utcnow()
                 else:
-                    sent_at = datetime.utcnow()
+                    sent_at = datetime.now(timezone.utc)
                 try:
                     # Obtener idMessage desde diferentes ubicaciones posibles (puede estar en mensaje_data o data)
                     id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''

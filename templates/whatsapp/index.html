@@ -82,7 +82,7 @@
                             </span>
                         {% endif %}
                         <div class="tile-meta">
-                            {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+                            {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
                         </div>
                     </div>
                 </div>
