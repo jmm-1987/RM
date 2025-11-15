@@ -31,14 +31,35 @@ from collections import UserDict
 
 app = Flask(__name__)
 
-# Configuración general (siempre SQLite por defecto)
+# Configuración general
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///recambios.db')
+
+# Convertir postgres:// a postgresql:// (compatibilidad con Render)
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# En producción, usar la URL interna de Render si está disponible
+if os.environ.get('RENDER'):
+    # Render proporciona DATABASE_URL automáticamente
+    # Si hay una URL interna específica, se puede usar aquí
+    internal_db_url = os.environ.get('INTERNAL_DATABASE_URL')
+    if internal_db_url:
+        database_url = internal_db_url
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['DEBUG'] = os.environ.get('DEBUG', 'True').lower() == 'true'
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
+    'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
+    'connect_args': {
+        'connect_timeout': 10,
+        'sslmode': 'require' if 'postgresql' in database_url else None
+    }
+}
+app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Configuración común
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -62,44 +83,81 @@ def load_user(user_id):
 
 # Asegurar que las tablas existen (incluye las de WhatsApp)
 with app.app_context():
-    db.create_all()
-    # Verificar y crear tabla de usuario si no existe
     try:
-        inspector = inspect(db.engine)
-        if 'usuario' not in inspector.get_table_names():
-            print("⚠️ Tabla 'usuario' no encontrada, creándola...")
-            db.create_all()
-    except Exception as e:
-        print(f"⚠️ Error verificando tablas: {e}")
+        print(f"🔌 Conectando a base de datos: {database_url.split('@')[-1] if '@' in database_url else 'SQLite local'}")
         db.create_all()
-    inspector = inspect(db.engine)
-    try:
-        # Añadir columna color a la tabla usuario si no existe
-        if 'usuario' in inspector.get_table_names():
-            usuario_columns = {col['name'] for col in inspector.get_columns('usuario')}
-            if 'color' not in usuario_columns:
-                with db.engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE usuario ADD COLUMN color VARCHAR(7) DEFAULT '#007bff'"))
-                    print("✅ Columna 'color' añadida a la tabla 'usuario'")
+        print("✅ Tablas creadas/verificadas correctamente")
         
-        whatsapp_columns = {col['name'] for col in inspector.get_columns('whatsapp_message')}
-        with db.engine.begin() as conn:
-            if 'media_type' not in whatsapp_columns:
-                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_type VARCHAR(32)"))
-            if 'media_url' not in whatsapp_columns:
-                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
-            if 'usuario_id' not in whatsapp_columns:
-                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER REFERENCES usuario(id)"))
-                print("✅ Columna 'usuario_id' añadida a la tabla 'whatsapp_message'")
-    except Exception:
-        pass
-    try:
-        cliente_columns = {col['name'] for col in inspector.get_columns('cliente')}
-        if 'codigo' not in cliente_columns:
-            with db.engine.begin() as conn:
-                conn.execute(text("ALTER TABLE cliente ADD COLUMN codigo VARCHAR(50)"))
-    except Exception:
-        pass
+        # Verificar y crear tabla de usuario si no existe
+        try:
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+            print(f"📊 Tablas existentes: {', '.join(existing_tables)}")
+            
+            if 'usuario' not in existing_tables:
+                print("⚠️ Tabla 'usuario' no encontrada, creándola...")
+                db.create_all()
+        except Exception as e:
+            print(f"⚠️ Error verificando tablas: {e}")
+            db.create_all()
+        
+        inspector = inspect(db.engine)
+        try:
+            # Añadir columna color a la tabla usuario si no existe
+            if 'usuario' in inspector.get_table_names():
+                usuario_columns = {col['name'] for col in inspector.get_columns('usuario')}
+                if 'color' not in usuario_columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE usuario ADD COLUMN color VARCHAR(7) DEFAULT '#007bff'"))
+                        print("✅ Columna 'color' añadida a la tabla 'usuario'")
+            
+            # Migraciones para whatsapp_message
+            if 'whatsapp_message' in inspector.get_table_names():
+                whatsapp_columns = {col['name'] for col in inspector.get_columns('whatsapp_message')}
+                with db.engine.begin() as conn:
+                    if 'media_type' not in whatsapp_columns:
+                        conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_type VARCHAR(32)"))
+                        print("✅ Columna 'media_type' añadida a la tabla 'whatsapp_message'")
+                    if 'media_url' not in whatsapp_columns:
+                        conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
+                        print("✅ Columna 'media_url' añadida a la tabla 'whatsapp_message'")
+                    if 'usuario_id' not in whatsapp_columns:
+                        # Para PostgreSQL, necesitamos manejar la foreign key correctamente
+                        try:
+                            conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER"))
+                            # Intentar añadir la foreign key (puede fallar si ya existe)
+                            try:
+                                conn.execute(text("ALTER TABLE whatsapp_message ADD CONSTRAINT fk_whatsapp_message_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id)"))
+                            except Exception:
+                                pass  # La constraint puede ya existir
+                        except Exception:
+                            # Si falla, al menos intentar añadir la columna sin foreign key
+                            try:
+                                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER"))
+                            except Exception:
+                                pass
+                        print("✅ Columna 'usuario_id' añadida a la tabla 'whatsapp_message'")
+        except Exception as e:
+            print(f"⚠️ Error en migraciones de columnas: {e}")
+            import traceback
+            print(traceback.format_exc())
+        
+        try:
+            if 'cliente' in inspector.get_table_names():
+                cliente_columns = {col['name'] for col in inspector.get_columns('cliente')}
+                if 'codigo' not in cliente_columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE cliente ADD COLUMN codigo VARCHAR(50)"))
+                        print("✅ Columna 'codigo' añadida a la tabla 'cliente'")
+        except Exception as e:
+            print(f"⚠️ Error añadiendo columna codigo a cliente: {e}")
+            
+        print("✅ Base de datos inicializada correctamente")
+    except Exception as e:
+        print(f"❌ Error crítico inicializando base de datos: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise
 
 # Variable para controlar la inicialización
 _sistema_inicializado = False
@@ -2124,6 +2182,8 @@ def webhook_whatsapp():
                 tipo_mensaje = 'imagen'
                 # Intentar obtener downloadUrl
                 archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
+                id_message = mensaje_data.get('idMessage', '')
+                print(f"📷 Imagen recibida - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}")
                 # Si no hay downloadUrl, el external_id se usará para descargar después
             elif 'documentMessageData' in message_data:
                 mensaje_texto = message_data['documentMessageData'].get('caption', '')
@@ -2176,21 +2236,29 @@ def webhook_whatsapp():
                 else:
                     sent_at = datetime.utcnow()
                 try:
+                    id_message = mensaje_data.get('idMessage', '')
                     _register_incoming_whatsapp_message(
                         chat_id_full,
                         mensaje_texto,
                         contact_name=chat_display_name,
                         sent_at=sent_at,
-                        external_id=mensaje_data.get('idMessage', ''),
+                        external_id=id_message,
                         media_type=tipo_mensaje if tipo_mensaje != 'texto' else None,
                         media_url=archivo_url,
                     )
+                    if tipo_mensaje != 'texto':
+                        print(f"📎 Media registrado - tipo: {tipo_mensaje}, external_id: {id_message}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
                 except Exception as exc:  # noqa: BLE001
                     print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
+                    import traceback
+                    print(f"⚠️ Traceback: {traceback.format_exc()}")
 
             db.session.commit()
             
-            print(f"✅ Mensaje recibido de {telefono_remitente}: {mensaje_texto[:50]}...")
+            # Log mejorado con información del tipo de mensaje
+            tipo_info = f" ({tipo_mensaje})" if tipo_mensaje != 'texto' else ""
+            archivo_info = f" - URL: {archivo_url[:50]}..." if archivo_url else ""
+            print(f"✅ Mensaje recibido de {telefono_remitente}{tipo_info}: {mensaje_texto[:50]}...{archivo_info}")
             
             return jsonify({'status': 'success', 'message': 'Message processed'}), 200
         
