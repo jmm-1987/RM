@@ -75,9 +75,10 @@
                 <div class="tile-header d-flex justify-content-between align-items-center">
                     <div class="tile-name">{{ conversation.contact_name or conversation.contact_number|chat_display }}</div>
                     <div class="d-flex align-items-center gap-2">
-                        {% if last and last.sender_type == 'agent' and last.usuario %}
-                            <span class="badge" style="background-color: {{ last.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
-                                <i class="fas fa-user"></i> {{ last.usuario.username }}
+                        {% set last_agent = conversation.last_agent_message() %}
+                        {% if last_agent and last_agent.usuario %}
+                            <span class="badge" style="background-color: {{ last_agent.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
+                                <i class="fas fa-user"></i> {{ last_agent.usuario.username }}
                             </span>
                         {% endif %}
                         <div class="tile-meta">
@@ -174,10 +175,11 @@
             const rightSide = document.createElement("div");
             rightSide.className = "d-flex align-items-center gap-2";
 
-            // Añadir badge del último usuario del sistema que habló (solo agentes, no clientes)
-            if (item.last_message_sender === "agent" && item.last_usuario) {
+            // Añadir badge del último usuario del sistema que habló (siempre mostrar, incluso si el último mensaje es del cliente)
+            if (item.last_usuario) {
                 const userBadge = document.createElement("span");
                 userBadge.className = "badge";
+                // Usar el color del usuario directamente de su ficha
                 userBadge.style.backgroundColor = item.last_usuario.color || "#007bff";
                 userBadge.style.color = "white";
                 userBadge.style.fontSize = "0.75rem";

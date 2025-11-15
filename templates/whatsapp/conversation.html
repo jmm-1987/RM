@@ -48,32 +48,39 @@
                         <small class="text-muted">{{ message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
                     </div>
                     <div class="message-content">
-                        {% if message.media_type and (message.media_url or message.external_id) %}
-                            {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
-                            {% if message.media_type == 'imagen' %}
-                                <a href="{{ media_route }}" target="_blank" rel="noopener" download class="media-link">
-                                    <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                    <div style="display:none;" class="attachment-chip">
-                                        <i class="fas fa-image"></i>
-                                        <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
+                        {% if message.media_type %}
+                            {% if message.media_url or message.external_id %}
+                                {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
+                                {% if message.media_type == 'imagen' %}
+                                    <a href="{{ media_route }}" target="_blank" rel="noopener" download class="media-link">
+                                        <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                        <div style="display:none;" class="attachment-chip">
+                                            <i class="fas fa-image"></i>
+                                            <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
+                                        </div>
+                                    </a>
+                                {% elif message.media_type == 'video' %}
+                                    <video controls class="media-preview video-preview">
+                                        <source src="{{ media_route }}">
+                                        Tu navegador no soporta video.
+                                    </video>
+                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar video</a></div>
+                                {% elif message.media_type == 'audio' %}
+                                    <audio controls class="audio-player">
+                                        <source src="{{ media_route }}">
+                                        Tu navegador no soporta audio.
+                                    </audio>
+                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
+                                {% else %}
+                                    <div class="attachment-chip">
+                                        <i class="fas fa-paperclip"></i>
+                                        <a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar archivo</a>
                                     </div>
-                                </a>
-                            {% elif message.media_type == 'video' %}
-                                <video controls class="media-preview video-preview">
-                                    <source src="{{ media_route }}">
-                                    Tu navegador no soporta video.
-                                </video>
-                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar video</a></div>
-                            {% elif message.media_type == 'audio' %}
-                                <audio controls class="audio-player">
-                                    <source src="{{ media_route }}">
-                                    Tu navegador no soporta audio.
-                                </audio>
-                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
+                                {% endif %}
                             {% else %}
+                                {# Si hay media_type pero no hay URL ni external_id, mostrar un indicador #}
                                 <div class="attachment-chip">
-                                    <i class="fas fa-paperclip"></i>
-                                    <a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar archivo</a>
+                                    <i class="fas fa-image"></i> Imagen (no disponible)
                                 </div>
                             {% endif %}
                         {% endif %}
@@ -118,10 +125,12 @@
     const contactLabel = thread.dataset.contactName || "Cliente";
 
     function buildMediaContent(container, msg) {
-        if (msg.media_type && (msg.media_route || msg.media_url)) {
+        // Mostrar media si hay media_type y (media_route, media_url o external_id)
+        if (msg.media_type && (msg.media_route || msg.media_url || msg.external_id)) {
             const mediaWrapper = document.createElement("div");
             mediaWrapper.className = "message-media";
-            const sourceUrl = msg.media_route || msg.media_url;
+            // Preferir media_route (generado por el servidor), luego media_url, luego construir desde external_id
+            const sourceUrl = msg.media_route || msg.media_url || (msg.external_id ? `/whatsapp/media/${msg.id}` : null);
 
             switch (msg.media_type) {
                 case "imagen":

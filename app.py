@@ -395,13 +395,15 @@ def _register_outgoing_whatsapp_message(
 
 def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
     last = conversation.last_message()
+    # Buscar el último mensaje de un agente (siempre mostrar el último agente que escribió)
+    last_agent = conversation.last_agent_message()
     last_usuario = None
-    # Solo incluir usuario si el último mensaje es de un agente (no del cliente)
-    if last and last.sender_type == 'agent' and last.usuario:
+    # Siempre incluir el último usuario agente que escribió, incluso si el último mensaje es del cliente
+    if last_agent and last_agent.usuario:
         last_usuario = {
-            "id": last.usuario.id,
-            "username": last.usuario.username,
-            "color": last.usuario.color or "#007bff",
+            "id": last_agent.usuario.id,
+            "username": last_agent.usuario.username,
+            "color": last_agent.usuario.color or "#007bff",  # Fallback solo si es None
         }
     return {
         "id": conversation.id,
@@ -426,6 +428,11 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
             "username": message.usuario.username,
             "color": message.usuario.color or "#007bff",
         }
+    # Generar media_route si hay media_type y (media_url o external_id)
+    media_route = None
+    if message.media_type and (message.media_url or message.external_id):
+        media_route = url_for('whatsapp_media', message_id=message.id)
+    
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -436,7 +443,8 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
         "is_read": message.is_read,
         "media_type": message.media_type,
         "media_url": message.media_url,
-        "media_route": url_for('whatsapp_media', message_id=message.id) if message.media_url else None,
+        "external_id": message.external_id,  # Incluir external_id para debugging
+        "media_route": media_route,
         "usuario": usuario_data,
     }
 
@@ -2152,12 +2160,16 @@ def webhook_whatsapp():
                 mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
                 tipo_mensaje = 'texto'
             elif 'imageMessageData' in message_data:
-                mensaje_texto = message_data['imageMessageData'].get('caption', '') or '[Imagen]'
+                mensaje_texto = message_data['imageMessageData'].get('caption', '') or ''
                 tipo_mensaje = 'imagen'
                 # Intentar obtener downloadUrl
                 archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
-                id_message = mensaje_data.get('idMessage', '')
-                print(f"📷 Imagen recibida - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}")
+                # Obtener idMessage desde diferentes ubicaciones posibles
+                id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
+                print(f"📷 Imagen recibida - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
+                # Si no hay caption, usar texto vacío (la imagen se mostrará por media_type)
+                if not mensaje_texto:
+                    mensaje_texto = '[Imagen]'
                 # Si no hay downloadUrl, el external_id se usará para descargar después
             elif 'documentMessageData' in message_data:
                 mensaje_texto = message_data['documentMessageData'].get('caption', '')
@@ -2210,18 +2222,24 @@ def webhook_whatsapp():
                 else:
                     sent_at = datetime.utcnow()
                 try:
-                    id_message = mensaje_data.get('idMessage', '')
+                    # Obtener idMessage desde diferentes ubicaciones posibles (puede estar en mensaje_data o data)
+                    id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
+                    # Si es una imagen y no tenemos idMessage, intentar obtenerlo del imageMessageData
+                    if tipo_mensaje == 'imagen' and not id_message:
+                        image_data = message_data.get('imageMessageData', {})
+                        id_message = image_data.get('idMessage') or ''
+                    
                     _register_incoming_whatsapp_message(
                         chat_id_full,
                         mensaje_texto,
                         contact_name=chat_display_name,
                         sent_at=sent_at,
-                        external_id=id_message,
+                        external_id=id_message if id_message else None,
                         media_type=tipo_mensaje if tipo_mensaje != 'texto' else None,
-                        media_url=archivo_url,
+                        media_url=archivo_url if archivo_url else None,
                     )
                     if tipo_mensaje != 'texto':
-                        print(f"📎 Media registrado - tipo: {tipo_mensaje}, external_id: {id_message}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
+                        print(f"📎 Media registrado - tipo: {tipo_mensaje}, external_id: {id_message or 'N/A'}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
                 except Exception as exc:  # noqa: BLE001
                     print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
                     import traceback

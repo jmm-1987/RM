@@ -188,6 +188,10 @@ class WhatsAppConversation(db.Model):
     def last_message(self):
         return self.messages.order_by(WhatsAppMessage.sent_at.desc(), WhatsAppMessage.id.desc()).first()
 
+    def last_agent_message(self):
+        """Obtiene el último mensaje enviado por un agente (usuario del sistema)"""
+        return self.messages.filter_by(sender_type='agent').order_by(WhatsAppMessage.sent_at.desc(), WhatsAppMessage.id.desc()).first()
+
     def unread_count(self):
         return self.messages.filter_by(sender_type='customer', is_read=False).count()
 
