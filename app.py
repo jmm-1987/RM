@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response, abort, has_request_context
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from markupsafe import Markup
 from models import (
     db,
@@ -13,6 +14,7 @@ from models import (
     ProgramacionMasiva,
     WhatsAppConversation,
     WhatsAppMessage,
+    Usuario,
 )
 from whatsapp_sender import enviar_whatsapp, configurar_green_api, green_api_sender
 from datetime import datetime, date, timezone
@@ -47,17 +49,48 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 
+# Configurar Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Por favor, inicia sesión para acceder a esta página.'
+login_manager.login_message_category = 'info'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Usuario.query.get(int(user_id))
+
 # Asegurar que las tablas existen (incluye las de WhatsApp)
 with app.app_context():
     db.create_all()
+    # Verificar y crear tabla de usuario si no existe
+    try:
+        inspector = inspect(db.engine)
+        if 'usuario' not in inspector.get_table_names():
+            print("⚠️ Tabla 'usuario' no encontrada, creándola...")
+            db.create_all()
+    except Exception as e:
+        print(f"⚠️ Error verificando tablas: {e}")
+        db.create_all()
     inspector = inspect(db.engine)
     try:
+        # Añadir columna color a la tabla usuario si no existe
+        if 'usuario' in inspector.get_table_names():
+            usuario_columns = {col['name'] for col in inspector.get_columns('usuario')}
+            if 'color' not in usuario_columns:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE usuario ADD COLUMN color VARCHAR(7) DEFAULT '#007bff'"))
+                    print("✅ Columna 'color' añadida a la tabla 'usuario'")
+        
         whatsapp_columns = {col['name'] for col in inspector.get_columns('whatsapp_message')}
         with db.engine.begin() as conn:
             if 'media_type' not in whatsapp_columns:
                 conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_type VARCHAR(32)"))
             if 'media_url' not in whatsapp_columns:
                 conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
+            if 'usuario_id' not in whatsapp_columns:
+                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER REFERENCES usuario(id)"))
+                print("✅ Columna 'usuario_id' añadida a la tabla 'whatsapp_message'")
     except Exception:
         pass
     try:
@@ -198,6 +231,7 @@ def _append_whatsapp_message(
     is_read: bool = True,
     media_type: str | None = None,
     media_url: str | None = None,
+    usuario_id: int | None = None,
 ) -> WhatsAppMessage:
     message = WhatsAppMessage(
         conversation_id=conversation.id,
@@ -208,6 +242,7 @@ def _append_whatsapp_message(
         is_read=is_read,
         media_type=media_type,
         media_url=media_url,
+        usuario_id=usuario_id if sender_type == 'agent' else None,
     )
     conversation.updated_at = datetime.utcnow()
     db.session.add(message)
@@ -243,8 +278,17 @@ def _register_outgoing_whatsapp_message(
     external_id: str | None = None,
     media_type: str | None = None,
     media_url: str | None = None,
+    usuario_id: int | None = None,
 ):
     conversation = _ensure_whatsapp_conversation(chat_id)
+    # Si no se proporciona usuario_id, intentar obtener el usuario actual
+    if usuario_id is None:
+        try:
+            from flask_login import current_user
+            if hasattr(current_user, 'id') and current_user.is_authenticated:
+                usuario_id = current_user.id
+        except:
+            pass
     _append_whatsapp_message(
         conversation,
         sender_type="agent",
@@ -254,11 +298,19 @@ def _register_outgoing_whatsapp_message(
         is_read=True,
         media_type=media_type,
         media_url=media_url,
+        usuario_id=usuario_id,
     )
 
 
 def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
     last = conversation.last_message()
+    last_usuario = None
+    if last and last.usuario:
+        last_usuario = {
+            "id": last.usuario.id,
+            "username": last.usuario.username,
+            "color": last.usuario.color or "#007bff",
+        }
     return {
         "id": conversation.id,
         "display_name": conversation.contact_name or _chat_display(conversation.contact_number),
@@ -266,6 +318,7 @@ def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
         "last_message_text": last.message_text if last else "",
         "last_message_sender": last.sender_type if last else None,
         "last_media_type": last.media_type if last else None,
+        "last_usuario": last_usuario,
         "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
         "updated_at_human": conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "",
         "unread_count": conversation.unread_count(),
@@ -274,6 +327,13 @@ def _conversation_to_dict(conversation: WhatsAppConversation) -> dict:
 
 
 def _message_to_dict(message: WhatsAppMessage) -> dict:
+    usuario_data = None
+    if message.usuario:
+        usuario_data = {
+            "id": message.usuario.id,
+            "username": message.usuario.username,
+            "color": message.usuario.color or "#007bff",
+        }
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -285,6 +345,7 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
         "media_type": message.media_type,
         "media_url": message.media_url,
         "media_route": url_for('whatsapp_media', message_id=message.id) if message.media_url else None,
+        "usuario": usuario_data,
     }
 
 
@@ -616,6 +677,19 @@ def before_request():
     # Solo inicializar una vez y solo en producción
     if not _sistema_inicializado and not app.config['DEBUG']:
         inicializar_sistema()
+    
+    # Asegurar que el usuario admin existe siempre (se ejecuta en cada request hasta que se cree)
+    try:
+        usuario_admin = Usuario.query.filter_by(username='jmurillo').first()
+        if not usuario_admin:
+            usuario_admin = Usuario(username='jmurillo', activo=True)
+            usuario_admin.set_password('TxMb-7-0')
+            db.session.add(usuario_admin)
+            db.session.commit()
+            print("✅ Usuario administrador 'jmurillo' creado")
+    except Exception as e:
+        # Si hay error, no hacer nada (probablemente la tabla no existe aún)
+        pass
 
 def generar_enlace_web():
     """Genera el enlace completo a la web pública de ofertas"""
@@ -648,6 +722,7 @@ def index():
     return render_template('index.html', ofertas_destacadas=ofertas_destacadas, ofertas_normales=ofertas_normales)
 
 @app.route('/clientes')
+@login_required
 def clientes():
     zona_id = request.args.get('zona_id', type=int)
     filtro_estado = request.args.get('filtro_estado', 'activos')  # 'activos', 'todos', 'inactivos'
@@ -691,6 +766,7 @@ def clientes():
 
 
 @app.route('/clientes/nuevo', methods=['GET', 'POST'])
+@login_required
 def nuevo_cliente():
     zonas = Zona.query.all()
 
@@ -735,6 +811,7 @@ def nuevo_cliente():
 
 
 @app.route('/clientes/importar', methods=['POST'])
+@login_required
 def importar_clientes():
     file = request.files.get('archivo_clientes')
     if not file or file.filename == '':
@@ -914,6 +991,7 @@ def importar_clientes():
     return redirect(url_for('clientes'))
 
 @app.route('/clientes/editar/<int:cliente_id>', methods=['GET', 'POST'])
+@login_required
 def editar_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
     
@@ -941,6 +1019,7 @@ def editar_cliente(cliente_id):
 
 
 @app.post('/clientes/<int:cliente_id>/toggle')
+@login_required
 def toggle_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
     field = request.form.get('field')
@@ -970,6 +1049,7 @@ def toggle_cliente(cliente_id):
     return redirect(next_url)
 
 @app.route('/clientes/eliminar/<int:cliente_id>', methods=['POST'])
+@login_required
 def eliminar_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
     
@@ -985,6 +1065,7 @@ def eliminar_cliente(cliente_id):
     return redirect(url_for('clientes'))
 
 @app.route('/zonas')
+@login_required
 def zonas():
     zonas = Zona.query.order_by(Zona.nombre.asc()).all()
     zonas_data = [{'id': zona.id, 'nombre': zona.nombre} for zona in zonas]
@@ -992,6 +1073,7 @@ def zonas():
 
 
 @app.route('/zonas/nueva', methods=['POST'])
+@login_required
 def crear_zona():
     nombre = (request.form.get('nombre') or '').strip()
     descripcion = (request.form.get('descripcion') or '').strip() or None
@@ -1016,6 +1098,7 @@ def crear_zona():
     return redirect(url_for('zonas'))
 
 @app.route('/zonas/editar/<int:zona_id>', methods=['GET', 'POST'])
+@login_required
 def editar_zona(zona_id):
     zona = Zona.query.get_or_404(zona_id)
     
@@ -1039,6 +1122,7 @@ def editar_zona(zona_id):
     return render_template('editar_zona.html', zona=zona)
 
 @app.route('/zonas/eliminar/<int:zona_id>', methods=['POST'])
+@login_required
 def eliminar_zona(zona_id):
     zona = Zona.query.get_or_404(zona_id)
 
@@ -1107,12 +1191,14 @@ def actualizar_plantillas_con_enlace():
     return redirect(url_for('mensajes'))
 
 @app.route('/mensajes')
+@login_required
 def mensajes():
     plantillas = MensajePlantilla.query.filter_by(activo=True).all()
     return render_template('mensajes.html', plantillas=plantillas)
 
 
 @app.route('/mensajes/nuevo', methods=['GET', 'POST'])
+@login_required
 def nueva_plantilla():
     if request.method == 'POST':
         nombre = (request.form.get('nombre') or '').strip()
@@ -1137,6 +1223,7 @@ def nueva_plantilla():
     return render_template('nueva_plantilla.html')
 
 @app.route('/enviar_masivo', methods=['GET', 'POST'])
+@login_required
 def enviar_masivo():
     if request.method == 'POST':
         zona_id = request.form.get('zona_id')
@@ -1221,6 +1308,7 @@ def enviar_masivo():
     return render_template('enviar_masivo.html', zonas=zonas, plantillas=plantillas)
 
 @app.route('/historial')
+@login_required
 def historial():
     mensajes = MensajeEnviado.query.order_by(MensajeEnviado.created_at.desc()).limit(100).all()
     return render_template('historial.html', mensajes=mensajes)
@@ -1236,6 +1324,7 @@ def api_clientes_zona(zona_id):
 
 # Rutas para gestión de programaciones
 @app.route('/programaciones')
+@login_required
 def programaciones():
     programaciones_list = ProgramacionMasiva.query.order_by(ProgramacionMasiva.created_at.desc()).all()
     zonas = Zona.query.all()
@@ -1246,6 +1335,7 @@ def programaciones():
                          plantillas=plantillas)
 
 @app.route('/programaciones/nueva', methods=['POST'])
+@login_required
 def nueva_programacion():
     zona_id = request.form.get('zona_id')
     plantilla_id = request.form.get('plantilla_id')
@@ -1276,6 +1366,7 @@ def nueva_programacion():
     return redirect(url_for('programaciones'))
 
 @app.route('/programaciones/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
 def editar_programacion(id):
     programacion = ProgramacionMasiva.query.get_or_404(id)
     
@@ -1315,6 +1406,7 @@ def editar_programacion(id):
                          dias_seleccionados=dias_seleccionados)
 
 @app.route('/programaciones/<int:id>/eliminar', methods=['POST'])
+@login_required
 def eliminar_programacion(id):
     programacion = ProgramacionMasiva.query.get_or_404(id)
     try:
@@ -1328,6 +1420,7 @@ def eliminar_programacion(id):
     return redirect(url_for('programaciones'))
 
 @app.route('/programaciones/<int:id>/toggle', methods=['POST'])
+@login_required
 def toggle_programacion(id):
     programacion = ProgramacionMasiva.query.get_or_404(id)
     programacion.activo = not programacion.activo
@@ -1343,11 +1436,13 @@ def toggle_programacion(id):
 
 # Rutas para gestión de ofertas
 @app.route('/ofertas')
+@login_required
 def ofertas():
     ofertas = Oferta.query.filter_by(activa=True).order_by(Oferta.created_at.desc()).all()
     return render_template('ofertas_admin.html', ofertas=ofertas)
 
 @app.route('/ofertas/nueva', methods=['GET', 'POST'])
+@login_required
 def nueva_oferta():
     if request.method == 'POST':
         titulo = request.form.get('titulo')
@@ -1394,6 +1489,7 @@ def nueva_oferta():
     return render_template('nueva_oferta.html')
 
 @app.route('/ofertas/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
 def editar_oferta(id):
     oferta = Oferta.query.get_or_404(id)
     
@@ -1429,6 +1525,7 @@ def editar_oferta(id):
     return render_template('editar_oferta.html', oferta=oferta)
 
 @app.route('/ofertas/<int:id>/eliminar', methods=['POST'])
+@login_required
 def eliminar_oferta(id):
     oferta = Oferta.query.get_or_404(id)
     
@@ -1446,6 +1543,7 @@ def eliminar_oferta(id):
     return redirect(url_for('ofertas'))
 
 @app.route('/ofertas/<int:id>/toggle', methods=['POST'])
+@login_required
 def toggle_oferta(id):
     oferta = Oferta.query.get_or_404(id)
     oferta.activa = not oferta.activa
@@ -1456,8 +1554,95 @@ def toggle_oferta(id):
     return redirect(url_for('ofertas'))
 
 
+# Rutas de autenticación
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('panel'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            flash('Por favor, completa todos los campos.', 'error')
+            return render_template('login.html')
+        
+        usuario = Usuario.query.filter_by(username=username).first()
+        
+        if not usuario:
+            flash('Usuario o contraseña incorrectos.', 'error')
+        elif not usuario.activo:
+            flash('Tu cuenta está desactivada. Contacta al administrador.', 'error')
+        elif usuario.check_password(password):
+            login_user(usuario)
+            next_page = request.args.get('next')
+            flash(f'¡Bienvenido, {usuario.username}!', 'success')
+            return redirect(next_page) if next_page else redirect(url_for('panel'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Has cerrado sesión correctamente.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/reset-password-admin')
+def reset_password_admin():
+    """Ruta temporal para resetear la contraseña del administrador"""
+    try:
+        # Asegurar que la tabla existe
+        db.create_all()
+        
+        usuario = Usuario.query.filter_by(username='jmurillo').first()
+        if usuario:
+            usuario.set_password('TxMb-7-0')
+            usuario.activo = True
+            db.session.commit()
+            
+            # Verificar que se guardó
+            usuario_verificado = Usuario.query.filter_by(username='jmurillo').first()
+            return jsonify({
+                'status': 'success',
+                'message': f'Contraseña del usuario jmurillo actualizada correctamente. Nueva contraseña: TxMb-7-0. Usuario activo: {usuario_verificado.activo if usuario_verificado else "No encontrado"}',
+                'usuario_id': usuario_verificado.id if usuario_verificado else None
+            })
+        else:
+            # Crear el usuario si no existe
+            usuario = Usuario(username='jmurillo', activo=True)
+            usuario.set_password('TxMb-7-0')
+            db.session.add(usuario)
+            db.session.flush()  # Para obtener el ID
+            db.session.commit()
+            
+            # Verificar que se creó
+            usuario_verificado = Usuario.query.filter_by(username='jmurillo').first()
+            if usuario_verificado:
+                return jsonify({
+                    'status': 'success',
+                    'message': f'Usuario jmurillo creado correctamente. Contraseña: TxMb-7-0. ID: {usuario_verificado.id}',
+                    'usuario_id': usuario_verificado.id
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'El usuario se intentó crear pero no se encontró después del commit.'
+                }), 500
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': f'Error: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
 # Rutas para la web pública
 @app.route('/panel')
+@login_required
 def panel():
     total_conversaciones = WhatsAppConversation.query.count()
     total_clientes = Cliente.query.filter_by(activo=True).count()
@@ -1471,6 +1656,7 @@ def panel():
 
 
 @app.route('/panel/envios-masivos')
+@login_required
 def panel_envios_masivos():
     total_clientes = Cliente.query.filter_by(activo=True).count()
     total_zonas = Zona.query.count()
@@ -1497,7 +1683,13 @@ def uploaded_file(filename):
 
 # Rutas para configuración de Green-API
 @app.route('/configuracion')
+@login_required
 def configuracion():
+    # Solo jmurillo puede acceder a configuración
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
     # Verificar estado actual de Green-API
     conectado, mensaje = green_api_sender.check_instance_status()
     
@@ -1518,9 +1710,13 @@ def configuracion():
             'phone': 'No configurado'
         }
     
-    return render_template('configuracion.html', conectado=conectado, mensaje=mensaje, config=config_data)
+    # Obtener lista de usuarios
+    usuarios = Usuario.query.order_by(Usuario.username.asc()).all()
+    
+    return render_template('configuracion.html', conectado=conectado, mensaje=mensaje, config=config_data, usuarios=usuarios)
 
 @app.route('/configuracion/green-api', methods=['GET', 'POST'])
+@login_required
 def configurar_green_api_route():
     config_data = {
         'url': '',
@@ -1574,6 +1770,7 @@ def configurar_green_api_route():
     return render_template('configurar_green_api.html', config=config_data)
 
 @app.route('/configuracion/test', methods=['POST'])
+@login_required
 def test_green_api():
     numero_test = request.form.get('numero_test')
     mensaje_test = request.form.get('mensaje_test', 'Mensaje de prueba desde Recambios RM')
@@ -1592,7 +1789,152 @@ def test_green_api():
     
     return redirect(url_for('configuracion'))
 
+# Rutas para gestión de usuarios (solo jmurillo)
+@app.route('/configuracion/usuarios')
+@login_required
+def gestion_usuarios():
+    """Lista de usuarios - solo accesible para jmurillo"""
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
+    usuarios = Usuario.query.order_by(Usuario.username.asc()).all()
+    return render_template('gestion_usuarios.html', usuarios=usuarios)
+
+@app.route('/configuracion/usuarios/nuevo', methods=['GET', 'POST'])
+@login_required
+def nuevo_usuario():
+    """Crear nuevo usuario - solo accesible para jmurillo"""
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        color = request.form.get('color', '#007bff')
+        activo = request.form.get('activo') == 'on'
+        
+        if not username or not password:
+            flash('El usuario y la contraseña son obligatorios.', 'error')
+            return render_template('nuevo_usuario.html')
+        
+        # Verificar si el usuario ya existe
+        if Usuario.query.filter_by(username=username).first():
+            flash('El usuario ya existe.', 'error')
+            return render_template('nuevo_usuario.html')
+        
+        try:
+            usuario = Usuario(username=username, activo=activo, color=color)
+            usuario.set_password(password)
+            db.session.add(usuario)
+            db.session.commit()
+            flash(f'Usuario {username} creado correctamente.', 'success')
+            return redirect(url_for('gestion_usuarios'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creando usuario: {str(e)}', 'error')
+    
+    return render_template('nuevo_usuario.html')
+
+@app.route('/configuracion/usuarios/<int:usuario_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_usuario(usuario_id):
+    """Editar usuario - solo accesible para jmurillo"""
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
+    usuario = Usuario.query.get_or_404(usuario_id)
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        color = request.form.get('color', '#007bff')
+        activo = request.form.get('activo') == 'on'
+        
+        if not username:
+            flash('El usuario es obligatorio.', 'error')
+            return render_template('editar_usuario.html', usuario=usuario)
+        
+        # Verificar si el username ya existe en otro usuario
+        otro_usuario = Usuario.query.filter_by(username=username).first()
+        if otro_usuario and otro_usuario.id != usuario.id:
+            flash('El usuario ya existe.', 'error')
+            return render_template('editar_usuario.html', usuario=usuario)
+        
+        try:
+            usuario.username = username
+            usuario.color = color
+            usuario.activo = activo
+            
+            # Solo actualizar contraseña si se proporcionó una nueva
+            if password:
+                usuario.set_password(password)
+            
+            db.session.commit()
+            flash(f'Usuario {username} actualizado correctamente.', 'success')
+            return redirect(url_for('gestion_usuarios'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error actualizando usuario: {str(e)}', 'error')
+    
+    return render_template('editar_usuario.html', usuario=usuario)
+
+@app.route('/configuracion/usuarios/<int:usuario_id>/toggle', methods=['POST'])
+@login_required
+def toggle_usuario(usuario_id):
+    """Activar/desactivar usuario - solo accesible para jmurillo"""
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
+    usuario = Usuario.query.get_or_404(usuario_id)
+    
+    # No permitir desactivarse a sí mismo
+    if usuario.id == current_user.id:
+        flash('No puedes desactivar tu propio usuario.', 'error')
+        return redirect(url_for('gestion_usuarios'))
+    
+    try:
+        usuario.activo = not usuario.activo
+        db.session.commit()
+        estado = 'activado' if usuario.activo else 'desactivado'
+        flash(f'Usuario {usuario.username} {estado} correctamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error actualizando usuario: {str(e)}', 'error')
+    
+    return redirect(url_for('gestion_usuarios'))
+
+@app.route('/configuracion/usuarios/<int:usuario_id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_usuario(usuario_id):
+    """Eliminar usuario - solo accesible para jmurillo"""
+    if current_user.username != 'jmurillo':
+        flash('No tienes permisos para acceder a esta sección.', 'error')
+        return redirect(url_for('panel'))
+    
+    usuario = Usuario.query.get_or_404(usuario_id)
+    
+    # No permitir eliminarse a sí mismo
+    if usuario.id == current_user.id:
+        flash('No puedes eliminar tu propio usuario.', 'error')
+        return redirect(url_for('gestion_usuarios'))
+    
+    try:
+        username = usuario.username
+        db.session.delete(usuario)
+        db.session.commit()
+        flash(f'Usuario {username} eliminado correctamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error eliminando usuario: {str(e)}', 'error')
+    
+    return redirect(url_for('gestion_usuarios'))
+
 @app.route('/diagnostico-green-api')
+@login_required
 def diagnostico_green_api():
     """Ruta de diagnóstico para verificar el estado de Green-API"""
     diagnostico = {
@@ -1778,9 +2120,11 @@ def webhook_whatsapp():
                 mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
                 tipo_mensaje = 'texto'
             elif 'imageMessageData' in message_data:
-                mensaje_texto = message_data['imageMessageData'].get('caption', '')
+                mensaje_texto = message_data['imageMessageData'].get('caption', '') or '[Imagen]'
                 tipo_mensaje = 'imagen'
+                # Intentar obtener downloadUrl
                 archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
+                # Si no hay downloadUrl, el external_id se usará para descargar después
             elif 'documentMessageData' in message_data:
                 mensaje_texto = message_data['documentMessageData'].get('caption', '')
                 tipo_mensaje = 'documento'
@@ -1858,6 +2202,7 @@ def webhook_whatsapp():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/mensajes-recibidos')
+@login_required
 def mensajes_recibidos():
     """Página para ver mensajes recibidos"""
     # Obtener mensajes no leídos primero, luego los leídos
@@ -1869,6 +2214,7 @@ def mensajes_recibidos():
                          mensajes_leidos=mensajes_leidos)
 
 @app.route('/mensajes-recibidos/<int:mensaje_id>/marcar-leido', methods=['POST'])
+@login_required
 def marcar_mensaje_leido(mensaje_id):
     """Marcar un mensaje como leído"""
     mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
@@ -1878,6 +2224,7 @@ def marcar_mensaje_leido(mensaje_id):
     return jsonify({'status': 'success'})
 
 @app.route('/mensajes-recibidos/<int:mensaje_id>/responder', methods=['POST'])
+@login_required
 def responder_mensaje(mensaje_id):
     """Responder a un mensaje recibido"""
     mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
@@ -1928,6 +2275,7 @@ def responder_mensaje(mensaje_id):
     return redirect(url_for('mensajes_recibidos'))
 
 @app.route('/mensajes-recibidos/<int:mensaje_id>/ver-conversacion')
+@login_required
 def ver_conversacion(mensaje_id):
     """Ver la conversación completa con un cliente"""
     mensaje = MensajeRecibido.query.get_or_404(mensaje_id)
@@ -1973,12 +2321,14 @@ def ver_conversacion(mensaje_id):
 
 # Interfaces de WhatsApp avanzadas
 @app.route('/whatsapp')
+@login_required
 def whatsapp_dashboard():
     conversaciones = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).all()
     return render_template('whatsapp/index.html', conversaciones=conversaciones)
 
 
 @app.route('/whatsapp/conversaciones/nueva', methods=['GET', 'POST'])
+@login_required
 def whatsapp_new_conversation():
     if request.method == 'POST':
         raw_number = (request.form.get('contact_number') or '').strip()
@@ -2027,6 +2377,7 @@ def whatsapp_new_conversation():
 
 
 @app.route('/whatsapp/conversaciones/<int:conversation_id>', methods=['GET', 'POST'])
+@login_required
 def whatsapp_conversation_detail(conversation_id):
     conversation = WhatsAppConversation.query.get_or_404(conversation_id)
 
@@ -2051,6 +2402,7 @@ def whatsapp_conversation_detail(conversation_id):
             sent_at=datetime.utcnow(),
             external_id=external_id,
             is_read=True,
+            usuario_id=current_user.id if current_user.is_authenticated else None,
         )
         db.session.commit()
         flash('Mensaje enviado correctamente', 'success')
@@ -2150,26 +2502,41 @@ def whatsapp_media(message_id: int):
     if not message.media_url and not message.external_id:
         abort(404)
 
+    # Si media_url es un marcador temporal (id:xxx), extraer el id
+    media_url = message.media_url
+    if media_url and media_url.startswith('id:'):
+        # Si es un marcador, usar external_id directamente
+        pass
+    elif media_url and not media_url.startswith('http'):
+        # Si no es una URL válida, intentar usar external_id
+        media_url = None
+
     try:
-        if message.media_url:
-            proxied = requests.get(message.media_url, timeout=30)
+        if media_url and not media_url.startswith('id:'):
+            proxied = requests.get(media_url, timeout=30)
             proxied.raise_for_status()
             mime_type = proxied.headers.get('Content-Type', 'application/octet-stream')
             return Response(proxied.content, mimetype=mime_type)
     except requests.exceptions.RequestException:
         pass
 
+    # Si no se pudo obtener desde media_url, intentar descargar usando external_id
     try:
         api_url, api_token, instance_id = _green_api_credentials()
     except Exception:
         abort(404)
 
-    if not message.external_id:
+    # Usar external_id o extraer de media_url si es un marcador
+    id_message = message.external_id
+    if not id_message and media_url and media_url.startswith('id:'):
+        id_message = media_url.replace('id:', '')
+
+    if not id_message:
         abort(404)
 
     try:
         download_endpoint = f"{api_url}/waInstance{instance_id}/downloadFile/{api_token}"
-        resp = requests.get(download_endpoint, params={'idMessage': message.external_id}, timeout=30)
+        resp = requests.get(download_endpoint, params={'idMessage': id_message}, timeout=30)
         resp.raise_for_status()
         payload = resp.json()
         file_data_base64 = payload.get('fileData')
@@ -2178,7 +2545,8 @@ def whatsapp_media(message_id: int):
         data = base64.b64decode(file_data_base64)
         mime_type = payload.get('mimeType', 'application/octet-stream')
         return Response(data, mimetype=mime_type)
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error descargando media: {e}")
         abort(404)
 
 # Ruta para polling de mensajes (respaldo al webhook)
@@ -2361,6 +2729,21 @@ def inicializar_sistema():
             print(f"- {len(ofertas_data)} ofertas de ejemplo creadas")
         else:
             print("✅ Sistema ya inicializado")
+        
+        # Crear o actualizar usuario inicial (siempre se ejecuta)
+        usuario_admin = Usuario.query.filter_by(username='jmurillo').first()
+        if not usuario_admin:
+            usuario_admin = Usuario(username='jmurillo', activo=True)
+            usuario_admin.set_password('TxMb-7-0')
+            db.session.add(usuario_admin)
+            db.session.commit()
+            print("✅ Usuario administrador 'jmurillo' creado")
+        else:
+            # Actualizar contraseña si el usuario ya existe
+            usuario_admin.set_password('TxMb-7-0')
+            usuario_admin.activo = True
+            db.session.commit()
+            print("✅ Contraseña del usuario 'jmurillo' actualizada")
             
     except Exception as e:
         print(f"❌ Error durante la inicialización: {e}")

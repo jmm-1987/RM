@@ -1,7 +1,30 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
 db = SQLAlchemy()
+
+class Usuario(db.Model, UserMixin):
+    __tablename__ = 'usuario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    color = db.Column(db.String(7), default='#007bff')  # Color en formato hexadecimal
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def set_password(self, password):
+        """Genera el hash de la contraseña"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verifica la contraseña"""
+        return check_password_hash(self.password_hash, password)
+    
+    def __repr__(self):
+        return f'<Usuario {self.username}>'
 
 class Zona(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -184,6 +207,10 @@ class WhatsAppMessage(db.Model):
     is_read = db.Column(db.Boolean, default=True, nullable=False, index=True)
     media_type = db.Column(db.String(32))
     media_url = db.Column(db.String(500))
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Usuario que envió el mensaje (si es agent)
+    
+    # Relación con Usuario
+    usuario = db.relationship('Usuario', backref='whatsapp_messages', lazy=True)
 
     def __repr__(self):
         return f'<WhatsAppMessage {self.id} {self.sender_type}>'

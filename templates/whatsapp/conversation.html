@@ -35,18 +35,28 @@
                 <div class="message-bubble {% if message.sender_type == 'agent' %}message-agent{% else %}message-customer{% endif %}">
                     <div class="message-meta">
                         {% if message.sender_type == 'agent' %}
-                            <span class="badge bg-primary">Tú</span>
+                            {% if message.usuario %}
+                                <span class="badge" style="background-color: {{ message.usuario.color or '#007bff' }}; color: white;">
+                                    {{ message.usuario.username }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-primary">Sistema</span>
+                            {% endif %}
                         {% else %}
                             <span class="badge bg-success">{{ contact_label }}</span>
                         {% endif %}
                         <small class="text-muted">{{ message.sent_at.strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
                     </div>
                     <div class="message-content">
-                        {% if message.media_type and message.media_url %}
+                        {% if message.media_type and (message.media_url or message.external_id) %}
                             {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
                             {% if message.media_type == 'imagen' %}
                                 <a href="{{ media_route }}" target="_blank" rel="noopener" download class="media-link">
-                                    <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview">
+                                    <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                    <div style="display:none;" class="attachment-chip">
+                                        <i class="fas fa-image"></i>
+                                        <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
+                                    </div>
                                 </a>
                             {% elif message.media_type == 'video' %}
                                 <video controls class="media-preview video-preview">
@@ -67,7 +77,7 @@
                                 </div>
                             {% endif %}
                         {% endif %}
-                        {% if message.message_text %}
+                        {% if message.message_text and message.message_text != '[Imagen]' %}
                             <div class="message-text">{{ message.message_text | nl2br }}</div>
                         {% endif %}
                     </div>
@@ -120,10 +130,19 @@
                     imgLink.target = "_blank";
                     imgLink.rel = "noopener";
                     imgLink.download = "";
+                    imgLink.className = "media-link";
                     const img = document.createElement("img");
                     img.src = sourceUrl;
                     img.alt = "Imagen recibida";
                     img.className = "media-preview";
+                    img.onerror = function() {
+                        // Si la imagen falla al cargar, mostrar un enlace de descarga
+                        img.style.display = 'none';
+                        const fallback = document.createElement("div");
+                        fallback.className = "attachment-chip";
+                        fallback.innerHTML = `<i class="fas fa-image"></i> <a href="${sourceUrl}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>`;
+                        imgLink.appendChild(fallback);
+                    };
                     imgLink.appendChild(img);
                     mediaWrapper.appendChild(imgLink);
                     break;
@@ -171,8 +190,20 @@
         meta.className = "message-meta";
 
         const badge = document.createElement("span");
-        badge.className = "badge " + (msg.sender_type === "agent" ? "bg-primary" : "bg-success");
-        badge.textContent = msg.sender_type === "agent" ? "Tú" : contactLabel;
+        if (msg.sender_type === "agent") {
+            if (msg.usuario && msg.usuario.username) {
+                badge.className = "badge";
+                badge.style.backgroundColor = msg.usuario.color || "#007bff";
+                badge.style.color = "white";
+                badge.textContent = msg.usuario.username;
+            } else {
+                badge.className = "badge bg-primary";
+                badge.textContent = "Sistema";
+            }
+        } else {
+            badge.className = "badge bg-success";
+            badge.textContent = contactLabel;
+        }
 
         const timestamp = document.createElement("small");
         timestamp.className = "text-muted";

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Lista de Usuarios</h5>
+                <a href="{{ url_for('nuevo_usuario') }}" class="btn btn-success">
+                    <i class="fas fa-user-plus"></i> Nuevo Usuario
+                </a>
+            </div>
+            <div class="card-body">
+                {% if usuarios %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Color</th>
+                                <th>Estado</th>
+                                <th>Creado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usuario in usuarios %}
+                            <tr>
+                                <td>
+                                    <span class="badge" style="background-color: {{ usuario.color or '#007bff' }}; color: white;">
+                                        <i class="fas fa-user"></i> {{ usuario.username }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <input type="color" value="{{ usuario.color or '#007bff' }}" class="form-control form-control-color" style="width: 50px; height: 35px;" disabled>
+                                        <span class="ms-2">{{ usuario.color or '#007bff' }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if usuario.activo %}
+                                        <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ usuario.created_at.strftime('%d/%m/%Y') if usuario.created_at else 'N/A' }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('editar_usuario', usuario_id=usuario.id) }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </a>
+                                        {% if usuario.id != current_user.id %}
+                                        <form method="POST" action="{{ url_for('toggle_usuario', usuario_id=usuario.id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm {% if usuario.activo %}btn-secondary{% else %}btn-success{% endif %}">
+                                                <i class="fas fa-{% if usuario.activo %}ban{% else %}check{% endif %}"></i>
+                                                {% if usuario.activo %}Desactivar{% else %}Activar{% endif %}
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('eliminar_usuario', usuario_id=usuario.id) }}" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar al usuario {{ usuario.username }}?');">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Eliminar
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <span class="btn btn-sm btn-outline-secondary disabled">Tu usuario</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay usuarios registrados.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="{{ url_for('configuracion') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver a Configuración
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

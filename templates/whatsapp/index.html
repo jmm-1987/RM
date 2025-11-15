@@ -72,15 +72,36 @@
             {% set last = conversation.last_message() %}
             {% set unread = conversation.unread_count() %}
             <a class="conversation-tile" href="{{ url_for('whatsapp_conversation_detail', conversation_id=conversation.id) }}">
-                <div class="tile-header">
+                <div class="tile-header d-flex justify-content-between align-items-center">
                     <div class="tile-name">{{ conversation.contact_name or conversation.contact_number|chat_display }}</div>
-                    <div class="tile-meta">
-                        {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+                    <div class="d-flex align-items-center gap-2">
+                        {% if last %}
+                            {% if last.sender_type == 'agent' and last.usuario %}
+                                <span class="badge" style="background-color: {{ last.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
+                                    <i class="fas fa-user"></i> {{ last.usuario.username }}
+                                </span>
+                            {% elif last.sender_type == 'customer' %}
+                                <span class="badge bg-success" style="font-size: 0.75rem;">
+                                    <i class="fas fa-user"></i> {{ conversation.contact_name or conversation.contact_number|chat_display }}
+                                </span>
+                            {% endif %}
+                        {% endif %}
+                        <div class="tile-meta">
+                            {{ conversation.updated_at.strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+                        </div>
                     </div>
                 </div>
                 <div class="tile-snippet">
                     {% if last %}
-                        {% set prefix = 'Tú:' if last.sender_type == 'agent' else (conversation.contact_name or conversation.contact_number|chat_display) ~ ':' %}
+                        {% if last.sender_type == 'agent' %}
+                            {% if last.usuario %}
+                                {% set prefix = last.usuario.username ~ ':' %}
+                            {% else %}
+                                {% set prefix = 'Sistema:' %}
+                            {% endif %}
+                        {% else %}
+                            {% set prefix = (conversation.contact_name or conversation.contact_number|chat_display) ~ ':' %}
+                        {% endif %}
                         {% if last.message_text %}
                             {{ prefix }} {{ last.message_text }}
                         {% elif last.media_type %}
@@ -93,7 +114,9 @@
                     {% endif %}
                 </div>
                 {% if unread %}
-                    <span class="badge bg-danger align-self-start">{{ unread }} sin leer</span>
+                <div class="tile-footer mt-2">
+                    <span class="badge bg-danger">{{ unread }} sin leer</span>
+                </div>
                 {% endif %}
             </a>
         {% endfor %}
@@ -148,24 +171,45 @@
             link.href = item.url;
 
             const header = document.createElement("div");
-            header.className = "tile-header";
+            header.className = "tile-header d-flex justify-content-between align-items-center";
 
             const name = document.createElement("div");
             name.className = "tile-name";
             name.textContent = item.display_name;
 
+            const rightSide = document.createElement("div");
+            rightSide.className = "d-flex align-items-center gap-2";
+
+            // Añadir badge del último usuario que habló
+            if (item.last_message_sender === "agent" && item.last_usuario) {
+                const userBadge = document.createElement("span");
+                userBadge.className = "badge";
+                userBadge.style.backgroundColor = item.last_usuario.color || "#007bff";
+                userBadge.style.color = "white";
+                userBadge.style.fontSize = "0.75rem";
+                userBadge.innerHTML = `<i class="fas fa-user"></i> ${item.last_usuario.username}`;
+                rightSide.appendChild(userBadge);
+            } else if (item.last_message_sender === "customer") {
+                const customerBadge = document.createElement("span");
+                customerBadge.className = "badge bg-success";
+                customerBadge.style.fontSize = "0.75rem";
+                customerBadge.innerHTML = `<i class="fas fa-user"></i> ${item.display_name}`;
+                rightSide.appendChild(customerBadge);
+            }
+
             const meta = document.createElement("div");
             meta.className = "tile-meta";
             meta.textContent = item.updated_at_human || "";
+            rightSide.appendChild(meta);
 
             header.appendChild(name);
-            header.appendChild(meta);
+            header.appendChild(rightSide);
 
             const snippet = document.createElement("div");
             snippet.className = "tile-snippet";
 
             const prefix = item.last_message_sender === "agent"
-                ? "Tú: "
+                ? (item.last_usuario ? item.last_usuario.username + ": " : "Sistema: ")
                 : `${item.display_name}: `;
 
             if (item.last_message_text) {
@@ -186,11 +230,15 @@
             link.appendChild(header);
             link.appendChild(snippet);
 
+            // Añadir badge de mensajes sin leer si hay
             if (item.unread_count) {
-                const badge = document.createElement("span");
-                badge.className = "badge bg-danger align-self-start";
-                badge.textContent = `${item.unread_count} sin leer`;
-                link.appendChild(badge);
+                const footer = document.createElement("div");
+                footer.className = "tile-footer mt-2";
+                const unreadBadge = document.createElement("span");
+                unreadBadge.className = "badge bg-danger";
+                unreadBadge.textContent = `${item.unread_count} sin leer`;
+                footer.appendChild(unreadBadge);
+                link.appendChild(footer);
             }
 
             listElement.appendChild(link);

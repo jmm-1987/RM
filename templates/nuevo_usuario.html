@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Usuario{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-user-plus"></i> Nuevo Usuario</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Crear Usuario</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Usuario <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" required autofocus>
+                        <div class="form-text">El nombre de usuario debe ser único.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">Mínimo 6 caracteres recomendado.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="color" class="form-label">Color</label>
+                        <div class="d-flex align-items-center">
+                            <input type="color" class="form-control form-control-color" id="color" name="color" value="#007bff" style="width: 80px; height: 40px;">
+                            <input type="text" class="form-control ms-2" id="color_hex" value="#007bff" readonly style="max-width: 120px;">
+                        </div>
+                        <div class="form-text">Color que identificará a este usuario en el sistema.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="activo" name="activo" checked>
+                            <label class="form-check-label" for="activo">
+                                Usuario activo
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('gestion_usuarios') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Crear Usuario
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sincronizar el color picker con el input de texto
+document.getElementById('color').addEventListener('input', function(e) {
+    document.getElementById('color_hex').value = e.target.value.toUpperCase();
+});
+
+document.getElementById('color_hex').addEventListener('input', function(e) {
+    const colorValue = e.target.value;
+    if (/^#[0-9A-F]{6}$/i.test(colorValue)) {
+        document.getElementById('color').value = colorValue;
+    }
+});
+</script>
+{% endblock %}
+

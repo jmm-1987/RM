@@ -70,53 +70,33 @@
                             <i class="fas fa-home"></i> Inicio
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes') }}">
-                            <i class="fas fa-users"></i> Clientes
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'zonas' %}active{% endif %}" href="{{ url_for('zonas') }}">
-                            <i class="fas fa-map-marker-alt"></i> Zonas
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'mensajes' %}active{% endif %}" href="{{ url_for('mensajes') }}">
-                            <i class="fas fa-comment"></i> Mensajes
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint in ['whatsapp_dashboard', 'whatsapp_conversation_detail', 'whatsapp_new_conversation'] %}active{% endif %}" href="{{ url_for('whatsapp_dashboard') }}">
-                            <i class="fab fa-whatsapp"></i> WhatsApp
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'enviar_masivo' %}active{% endif %}" href="{{ url_for('enviar_masivo') }}">
-                            <i class="fas fa-paper-plane"></i> Envío Masivo
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'ofertas' %}active{% endif %}" href="{{ url_for('ofertas') }}">
-                            <i class="fas fa-tag"></i> Gestionar Ofertas
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'historial' %}active{% endif %}" href="{{ url_for('historial') }}">
-                            <i class="fas fa-history"></i> Historial
-                        </a>
-                    </li>
+                    {% if current_user.is_authenticated and current_user.username == 'jmurillo' %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'configuracion' %}active{% endif %}" href="{{ url_for('configuracion') }}">
                             <i class="fas fa-cog"></i> Configuración
                         </a>
                     </li>
+                    {% endif %}
                 </ul>
                 <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}" target="_blank">
-                            <i class="fas fa-globe"></i> Web Pública
+                        <span class="nav-link text-light">
+                            <i class="fas fa-user"></i> {{ current_user.username }}
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
                         </a>
                     </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
