@@ -33,7 +33,23 @@ app = Flask(__name__)
 
 # Configuración general
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///recambios.db')
+
+# Obtener DATABASE_URL - REQUERIDO (solo PostgreSQL)
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    raise ValueError(
+        "❌ ERROR: DATABASE_URL no está configurada. "
+        "Esta aplicación requiere PostgreSQL. "
+        "Por favor, configura la variable de entorno DATABASE_URL con la URL de tu base de datos PostgreSQL."
+    )
+
+# Validar que sea PostgreSQL
+if not database_url.startswith(('postgresql://', 'postgres://')):
+    raise ValueError(
+        f"❌ ERROR: DATABASE_URL debe ser una URL de PostgreSQL. "
+        f"URL recibida: {database_url[:50]}... "
+        "Esta aplicación solo soporta PostgreSQL."
+    )
 
 # Convertir postgres:// a postgresql:// (compatibilidad con Render)
 if database_url.startswith('postgres://'):
@@ -52,20 +68,14 @@ if os.environ.get('RENDER'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Configuración del engine para PostgreSQL
-if 'postgresql' in database_url:
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
-        'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
-        'connect_args': {
-            'sslmode': 'require'
-        }
+# Configuración del engine para PostgreSQL (siempre PostgreSQL)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
+    'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
+    'connect_args': {
+        'sslmode': 'require'
     }
-else:
-    # Para SQLite, configuración mínima
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,
-    }
+}
 
 app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -92,7 +102,8 @@ def load_user(user_id):
 # Asegurar que las tablas existen (incluye las de WhatsApp)
 with app.app_context():
     try:
-        print(f"🔌 Conectando a base de datos: {database_url.split('@')[-1] if '@' in database_url else 'SQLite local'}")
+        db_host = database_url.split('@')[-1].split('/')[0] if '@' in database_url else 'PostgreSQL'
+        print(f"🔌 Conectando a PostgreSQL: {db_host}")
         db.create_all()
         print("✅ Tablas creadas/verificadas correctamente")
         
@@ -162,11 +173,8 @@ with app.app_context():
             
         print("✅ Base de datos inicializada correctamente")
         
-        # Ejecutar inicialización del sistema (datos de ejemplo y usuario admin)
-        try:
-            inicializar_sistema()
-        except Exception as e:
-            print(f"⚠️ Error en inicialización del sistema (puede ser normal si ya está inicializado): {e}")
+        # Nota: inicializar_sistema() se ejecutará automáticamente en before_request
+        # No se llama aquí porque aún no está definida en este punto del código
     except Exception as e:
         print(f"❌ Error crítico inicializando base de datos: {e}")
         import traceback
@@ -545,94 +553,8 @@ def _asegurar_scheduler():
         except Exception as e:
             print(f"❌ No se pudo iniciar el scheduler: {e}")
 
-def migrar_sqlite_a_postgres():
-    """Migrga datos de SQLite local a PostgreSQL en producción"""
-    try:
-        import sqlite3
-        import psycopg2
-        
-        # Verificar si existe la base de datos SQLite local
-        if not os.path.exists('recambios.db'):
-            print("ℹ️ No hay base de fdatos SQLite local para migrar")
-            return True
-        
-        # Conectar a SQLite local
-        sqlite_conn = sqlite3.connect('recambios.db')
-        sqlite_cursor = sqlite_conn.cursor()
-        
-        # Conectar a PostgreSQL
-        database_url = app.config['SQLALCHEMY_DATABASE_URI']
-        postgres_conn = psycopg2.connect(database_url)
-        postgres_cursor = postgres_conn.cursor()
-        
-        print("📝 Migrando datos de SQLite a PostgreSQL...")
-        
-        # Migrar zonas
-        sqlite_cursor.execute("SELECT id, nombre, descripcion FROM zona")
-        zonas = sqlite_cursor.fetchall()
-        for zona in zonas:
-            postgres_cursor.execute(
-                "INSERT INTO zona (id, nombre, descripcion) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                zona
-            )
-        
-        # Migrar clientes
-        sqlite_cursor.execute("SELECT id, nombre, telefono, zona_id, activo FROM cliente")
-        clientes = sqlite_cursor.fetchall()
-        for cliente in clientes:
-            postgres_cursor.execute(
-                "INSERT INTO cliente (id, nombre, telefono, zona_id, activo) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                cliente
-            )
-        
-        # Migrar plantillas
-        sqlite_cursor.execute("SELECT id, nombre, contenido FROM mensaje_plantilla")
-        plantillas = sqlite_cursor.fetchall()
-        for plantilla in plantillas:
-            postgres_cursor.execute(
-                "INSERT INTO mensaje_plantilla (id, nombre, contenido) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                plantilla
-            )
-        
-        # Migrar ofertas
-        sqlite_cursor.execute("SELECT id, titulo, descripcion, precio, imagen, activa, destacada, created_at, updated_at FROM oferta")
-        ofertas = sqlite_cursor.fetchall()
-        for oferta in ofertas:
-            postgres_cursor.execute(
-                "INSERT INTO oferta (id, titulo, descripcion, precio, imagen, activa, destacada, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                oferta
-            )
-        
-        # Migrar mensajes enviados
-        sqlite_cursor.execute("SELECT id, cliente_id, plantilla_id, mensaje_personalizado, mensaje_enviado, fecha_envio, error FROM mensaje_enviado")
-        mensajes = sqlite_cursor.fetchall()
-        for mensaje in mensajes:
-            postgres_cursor.execute(
-                "INSERT INTO mensaje_enviado (id, cliente_id, plantilla_id, mensaje_personalizado, mensaje_enviado, fecha_envio, error) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                mensaje
-            )
-        
-        # Migrar mensajes de ofertas
-        sqlite_cursor.execute("SELECT id, cliente_id, oferta_id, mensaje_personalizado, imagen_enviada, mensaje_enviado, fecha_envio, error FROM mensaje_oferta")
-        mensajes_ofertas = sqlite_cursor.fetchall()
-        for mensaje_oferta in mensajes_ofertas:
-            postgres_cursor.execute(
-                "INSERT INTO mensaje_oferta (id, cliente_id, oferta_id, mensaje_personalizado, imagen_enviada, mensaje_enviado, fecha_envio, error) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-                mensaje_oferta
-            )
-        
-        postgres_conn.commit()
-        print("✅ Migración completada exitosamente!")
-        print(f"- Zonas: {len(zonas)}, Clientes: {len(clientes)}, Plantillas: {len(plantillas)}")
-        print(f"- Ofertas: {len(ofertas)}, Mensajes: {len(mensajes)}, Mensajes Ofertas: {len(mensajes_ofertas)}")
-        
-        sqlite_conn.close()
-        postgres_conn.close()
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error en migración: {e}")
-        return False
+# Función de migración de SQLite eliminada - esta aplicación solo usa PostgreSQL
+# Si necesitas migrar datos desde SQLite, usa el script migrar_bd.py manualmente
 
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""

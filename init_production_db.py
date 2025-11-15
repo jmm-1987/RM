@@ -16,8 +16,10 @@ def init_database():
     """Inicializa la base de datos creando todas las tablas"""
     with app.app_context():
         try:
-            print("🔌 Conectando a la base de datos...")
-            print(f"   URL: {app.config['SQLALCHEMY_DATABASE_URI'].split('@')[-1] if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else 'SQLite local'}")
+            print("🔌 Conectando a PostgreSQL...")
+            db_url = app.config['SQLALCHEMY_DATABASE_URI']
+            db_host = db_url.split('@')[-1].split('/')[0] if '@' in db_url else 'PostgreSQL'
+            print(f"   Host: {db_host}")
             
             # Crear todas las tablas
             print("📦 Creando tablas...")

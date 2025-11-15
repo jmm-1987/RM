@@ -1,10 +1,23 @@
 # Configuración para producción en Render
 import os
 
-# Configuración de la base de datos para producción
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///recambios.db')
+# Configuración de la base de datos para producción - SOLO PostgreSQL
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    raise ValueError(
+        "❌ ERROR: DATABASE_URL no está configurada. "
+        "Esta aplicación requiere PostgreSQL."
+    )
 
-# Si es PostgreSQL, convertir la URL
+# Validar que sea PostgreSQL
+if not DATABASE_URL.startswith(('postgresql://', 'postgres://')):
+    raise ValueError(
+        f"❌ ERROR: DATABASE_URL debe ser una URL de PostgreSQL. "
+        f"URL recibida: {DATABASE_URL[:50] if DATABASE_URL else 'None'}... "
+        "Esta aplicación solo soporta PostgreSQL."
+    )
+
+# Convertir postgres:// a postgresql:// (compatibilidad con Render)
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
