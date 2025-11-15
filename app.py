@@ -2568,6 +2568,34 @@ def whatsapp_api_contacts():
 def whatsapp_health_check():
     return jsonify({'status': 'ok'}), 200
 
+@app.route('/whatsapp/debug/mensajes')
+@login_required
+def whatsapp_debug_mensajes():
+    """Ruta de diagnóstico para ver mensajes con media"""
+    # Obtener los últimos 10 mensajes con media_type
+    mensajes_con_media = WhatsAppMessage.query.filter(
+        WhatsAppMessage.media_type.isnot(None)
+    ).order_by(WhatsAppMessage.id.desc()).limit(10).all()
+    
+    resultado = []
+    for msg in mensajes_con_media:
+        resultado.append({
+            'id': msg.id,
+            'conversation_id': msg.conversation_id,
+            'sender_type': msg.sender_type,
+            'message_text': msg.message_text,
+            'media_type': msg.media_type,
+            'media_url': msg.media_url,
+            'external_id': msg.external_id,
+            'sent_at': msg.sent_at.isoformat() if msg.sent_at else None,
+            'tiene_media_route': bool(msg.media_url or msg.external_id),
+        })
+    
+    return jsonify({
+        'total': len(resultado),
+        'mensajes': resultado
+    })
+
 
 @app.route('/whatsapp/media/<int:message_id>')
 def whatsapp_media(message_id: int):

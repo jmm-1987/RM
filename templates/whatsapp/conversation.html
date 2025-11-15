@@ -227,11 +227,20 @@
 
         buildMediaContent(content, msg);
 
-        if (msg.message_text) {
+        // Mostrar texto solo si existe y no es el placeholder de imagen
+        if (msg.message_text && msg.message_text !== '[Imagen]') {
             const text = document.createElement("div");
             text.className = "message-text";
             text.textContent = msg.message_text;
             content.appendChild(text);
+        }
+        
+        // Si hay media pero no hay contenido visible, añadir un indicador
+        if (msg.media_type && content.children.length === 0) {
+            const indicator = document.createElement("div");
+            indicator.className = "text-muted small";
+            indicator.textContent = `[${msg.media_type}]`;
+            content.appendChild(indicator);
         }
 
         bubble.appendChild(content);
