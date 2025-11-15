@@ -161,11 +161,18 @@ with app.app_context():
             print(f"⚠️ Error añadiendo columna codigo a cliente: {e}")
             
         print("✅ Base de datos inicializada correctamente")
+        
+        # Ejecutar inicialización del sistema (datos de ejemplo y usuario admin)
+        try:
+            inicializar_sistema()
+        except Exception as e:
+            print(f"⚠️ Error en inicialización del sistema (puede ser normal si ya está inicializado): {e}")
     except Exception as e:
         print(f"❌ Error crítico inicializando base de datos: {e}")
         import traceback
         print(traceback.format_exc())
-        raise
+        # No hacer raise para que la app pueda iniciar aunque haya errores menores
+        print("⚠️ Continuando con el inicio de la aplicación...")
 
 # Variable para controlar la inicialización
 _sistema_inicializado = False
@@ -713,17 +720,40 @@ def inicializar_sistema():
             print("✅ Sistema ya inicializado")
         
         # Asegurar que todos los clientes tengan incluir=True (campo reservado para futuro)
-        clientes_sin_incluir = Cliente.query.filter_by(incluir=False).all()
-        if clientes_sin_incluir:
-            for cliente in clientes_sin_incluir:
-                cliente.incluir = True
-            db.session.commit()
-            print(f"✅ Actualizados {len(clientes_sin_incluir)} clientes para tener incluir=True")
+        try:
+            clientes_sin_incluir = Cliente.query.filter_by(incluir=False).all()
+            if clientes_sin_incluir:
+                for cliente in clientes_sin_incluir:
+                    cliente.incluir = True
+                db.session.commit()
+                print(f"✅ Actualizados {len(clientes_sin_incluir)} clientes para tener incluir=True")
+        except Exception:
+            pass  # Puede que la tabla cliente no exista aún
+        
+        # Crear o actualizar usuario inicial (siempre se ejecuta)
+        try:
+            usuario_admin = Usuario.query.filter_by(username='jmurillo').first()
+            if not usuario_admin:
+                usuario_admin = Usuario(username='jmurillo', activo=True)
+                usuario_admin.set_password('TxMb-7-0')
+                db.session.add(usuario_admin)
+                db.session.commit()
+                print("✅ Usuario administrador 'jmurillo' creado")
+            else:
+                # Actualizar contraseña si el usuario ya existe
+                usuario_admin.set_password('TxMb-7-0')
+                usuario_admin.activo = True
+                db.session.commit()
+                print("✅ Contraseña del usuario 'jmurillo' actualizada")
+        except Exception as e:
+            print(f"⚠️ Error creando usuario admin: {e}")
         
         _sistema_inicializado = True
             
     except Exception as e:
         print(f"❌ Error durante la inicialización: {e}")
+        import traceback
+        print(traceback.format_exc())
         db.session.rollback()
 
 def check_database_initialized():
@@ -740,9 +770,12 @@ def before_request():
     """Middleware que inicializa automáticamente la base de datos"""
     global _sistema_inicializado
     
-    # Solo inicializar una vez y solo en producción
-    if not _sistema_inicializado and not app.config['DEBUG']:
-        inicializar_sistema()
+    # Solo inicializar una vez (tanto en desarrollo como producción)
+    if not _sistema_inicializado:
+        try:
+            inicializar_sistema()
+        except Exception as e:
+            print(f"⚠️ Error en before_request inicializando sistema: {e}")
     
     # Asegurar que el usuario admin existe siempre (se ejecuta en cada request hasta que se cree)
     try:
@@ -2725,105 +2758,6 @@ def polling_mensajes():
 def activar_polling():
     """Página para activar el polling automático"""
     return render_template('activar_polling.html')
-
-def inicializar_sistema():
-    """Inicializa la base de datos y datos de ejemplo si es necesario"""
-    try:
-        # Crear todas las tablas
-        db.create_all()
-        
-        # Verificar si ya hay datos
-        if not Zona.query.first():
-            print("📝 Inicializando base de datos con datos de ejemplo...")
-            
-            # Crear zonas básicas
-            zonas_data = [
-                {'nombre': 'Centro', 'descripcion': 'Zona centro de la ciudad'},
-                {'nombre': 'Norte', 'descripcion': 'Zona norte de la ciudad'},
-                {'nombre': 'Sur', 'descripcion': 'Zona sur de la ciudad'},
-                {'nombre': 'Este', 'descripcion': 'Zona este de la ciudad'},
-                {'nombre': 'Oeste', 'descripcion': 'Zona oeste de la ciudad'}
-            ]
-            
-            for zona_data in zonas_data:
-                zona = Zona(**zona_data)
-                db.session.add(zona)
-            
-            # Crear plantillas de mensajes
-            plantillas_data = [
-                {
-                    'nombre': 'Visita Programada',
-                    'contenido': 'Hola {nombre_cliente}, somos de Recambios RM. Vamos a pasar por la zona {zona} mañana por la mañana. ¿Necesitas algún recambio específico? Te podemos llevar lo que necesites. ¡Gracias!'
-                },
-                {
-                    'nombre': 'Recordatorio de Visita',
-                    'contenido': 'Buenos días {nombre_cliente}, recordatorio: pasaremos por {zona} hoy por la tarde. Si necesitas algún recambio, avísanos antes de las 14:00. ¡Hasta pronto!'
-                },
-                {
-                    'nombre': 'Promoción Especial',
-                    'contenido': 'Hola {nombre_cliente}, tenemos una promoción especial esta semana. Pasaremos por {zona} con descuentos en recambios de motor. ¡No te lo pierdas!'
-                }
-            ]
-            
-            for plantilla_data in plantillas_data:
-                plantilla = MensajePlantilla(**plantilla_data)
-                db.session.add(plantilla)
-            
-            # Crear ofertas de ejemplo
-            ofertas_data = [
-                {
-                    'titulo': 'Aceite de Motor Premium',
-                    'descripcion': 'Aceite de motor de alta calidad para tu vehículo. Garantiza un rendimiento óptimo y protección del motor.',
-                    'precio': 25.99,
-                    'activa': True,
-                    'destacada': True
-                },
-                {
-                    'titulo': 'Filtro de Aire',
-                    'descripcion': 'Filtro de aire original para mantener el motor limpio y eficiente.',
-                    'precio': 12.50,
-                    'activa': True,
-                    'destacada': False
-                },
-                {
-                    'titulo': 'Pastillas de Freno',
-                    'descripcion': 'Pastillas de freno de alta calidad para una frenada segura y eficiente.',
-                    'precio': 45.00,
-                    'activa': True,
-                    'destacada': True
-                }
-            ]
-            
-            for oferta_data in ofertas_data:
-                oferta = Oferta(**oferta_data)
-                db.session.add(oferta)
-            
-            db.session.commit()
-            print("✅ Sistema inicializado exitosamente!")
-            print(f"- {len(zonas_data)} zonas creadas")
-            print(f"- {len(plantillas_data)} plantillas de mensajes creadas")
-            print(f"- {len(ofertas_data)} ofertas de ejemplo creadas")
-        else:
-            print("✅ Sistema ya inicializado")
-        
-        # Crear o actualizar usuario inicial (siempre se ejecuta)
-        usuario_admin = Usuario.query.filter_by(username='jmurillo').first()
-        if not usuario_admin:
-            usuario_admin = Usuario(username='jmurillo', activo=True)
-            usuario_admin.set_password('TxMb-7-0')
-            db.session.add(usuario_admin)
-            db.session.commit()
-            print("✅ Usuario administrador 'jmurillo' creado")
-        else:
-            # Actualizar contraseña si el usuario ya existe
-            usuario_admin.set_password('TxMb-7-0')
-            usuario_admin.activo = True
-            db.session.commit()
-            print("✅ Contraseña del usuario 'jmurillo' actualizada")
-            
-    except Exception as e:
-        print(f"❌ Error durante la inicialización: {e}")
-        db.session.rollback()
 
 if __name__ == '__main__':
     with app.app_context():
