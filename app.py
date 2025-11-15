@@ -34,14 +34,22 @@ app = Flask(__name__)
 # Configuración general
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
 
-# Obtener DATABASE_URL - REQUERIDO (solo PostgreSQL)
-database_url = os.environ.get('DATABASE_URL')
-if not database_url:
-    raise ValueError(
-        "❌ ERROR: DATABASE_URL no está configurada. "
-        "Esta aplicación requiere PostgreSQL. "
-        "Por favor, configura la variable de entorno DATABASE_URL con la URL de tu base de datos PostgreSQL."
-    )
+# URL de base de datos PostgreSQL por defecto (para desarrollo local)
+# Formato: postgresql://usuario:contraseña@host:5432/nombre_bd
+# IMPORTANTE: Para desarrollo local, usa la URL EXTERNA de Render (con el dominio completo)
+# La URL interna (sin dominio) solo funciona desde dentro de Render
+# Ejemplo URL externa: 'postgresql://usuario:password@dpg-xxxxx-a.oregon-postgres.render.com:5432/nombre_bd'
+# IMPORTANTE: Añade el dominio completo .oregon-postgres.render.com (o el que corresponda) al host
+DEFAULT_DATABASE_URL = 'postgresql://rm_aunv_user:Rh5sYRf0UnFAVSggD5OU8d6FTCRm1FIl@dpg-d4c6vu6r433s73dbo2lg-a.oregon-postgres.render.com/rm_aunv'
+
+# Obtener DATABASE_URL - Primero intenta variable de entorno, luego usa la URL por defecto
+database_url = os.environ.get('DATABASE_URL') or DEFAULT_DATABASE_URL
+
+# Si es la URL por defecto sin modificar, advertir pero permitir continuar
+if database_url == DEFAULT_DATABASE_URL:
+    print("⚠️ ADVERTENCIA: Usando URL de base de datos por defecto.")
+    print("   Configura DATABASE_URL en variables de entorno o actualiza DEFAULT_DATABASE_URL en app.py")
+    print("   Para producción en Render, configura DATABASE_URL en las variables de entorno del servicio")
 
 # Validar que sea PostgreSQL
 if not database_url.startswith(('postgresql://', 'postgres://')):
@@ -69,11 +77,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuración del engine para PostgreSQL (siempre PostgreSQL)
+# SSL solo requerido en producción (Render), en local puede no ser necesario
+ssl_mode = 'require' if os.environ.get('RENDER') else 'prefer'
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
     'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
     'connect_args': {
-        'sslmode': 'require'
+        'sslmode': ssl_mode
     }
 }
 

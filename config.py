@@ -1,13 +1,19 @@
 # Configuración para producción en Render
 import os
 
+# URL de base de datos PostgreSQL por defecto (para desarrollo local)
+# Formato: postgresql://usuario:contraseña@host:5432/nombre_bd
+# IMPORTANTE: Reemplaza esta URL con la de tu base de datos PostgreSQL
+# Ejemplo: 'postgresql://usuario:password@dpg-xxxxx-a.oregon-postgres.render.com:5432/nombre_bd'
+DEFAULT_DATABASE_URL = 'postgresql://usuario:contraseña@localhost:5432/nombre_bd'
+
 # Configuración de la base de datos para producción - SOLO PostgreSQL
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if not DATABASE_URL:
-    raise ValueError(
-        "❌ ERROR: DATABASE_URL no está configurada. "
-        "Esta aplicación requiere PostgreSQL."
-    )
+# Primero intenta variable de entorno, luego usa la URL por defecto
+DATABASE_URL = os.environ.get('DATABASE_URL') or DEFAULT_DATABASE_URL
+
+# Si es la URL por defecto sin modificar, advertir
+if DATABASE_URL == DEFAULT_DATABASE_URL:
+    print("⚠️ ADVERTENCIA: Usando URL de base de datos por defecto en config.py")
 
 # Validar que sea PostgreSQL
 if not DATABASE_URL.startswith(('postgresql://', 'postgres://')):
