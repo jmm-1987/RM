@@ -2137,10 +2137,16 @@ def webhook_whatsapp():
         if not data:
             return jsonify({'status': 'error', 'message': 'No data received'}), 400
         
+        # Log del payload completo para debugging
+        print(f"🔍 Webhook recibido - keys: {list(data.keys())}")
+        if 'body' in data:
+            print(f"🔍 Body keys: {list(data.get('body', {}).keys())}")
+        
         # Procesar mensaje recibido (admite payloads antiguos y nuevos)
         mensaje_data = data.get('body') or data
         
         if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
+            print(f"📥 Mensaje entrante detectado")
             # Extraer información del mensaje
             message_data = mensaje_data.get('messageData', {})
             sender_data = mensaje_data.get('senderData', {})
@@ -2152,6 +2158,8 @@ def webhook_whatsapp():
             mensaje_texto = ''
             tipo_mensaje = 'texto'
             archivo_url = None
+            
+            print(f"🔍 message_data keys: {list(message_data.keys())}")
             
             if 'textMessageData' in message_data:
                 mensaje_texto = message_data['textMessageData'].get('textMessage', '')
@@ -2240,6 +2248,8 @@ def webhook_whatsapp():
                     )
                     if tipo_mensaje != 'texto':
                         print(f"📎 Media registrado - tipo: {tipo_mensaje}, external_id: {id_message or 'N/A'}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
+                    else:
+                        print(f"✅ Mensaje de texto registrado correctamente")
                 except Exception as exc:  # noqa: BLE001
                     print(f"⚠️ No se pudo registrar la conversación avanzada: {exc}")
                     import traceback
@@ -2503,7 +2513,11 @@ def whatsapp_api_conversation_messages(conversation_id):
     serialized = []
 
     for message in messages:
-        serialized.append(_message_to_dict(message))
+        msg_dict = _message_to_dict(message)
+        # Log para debugging de mensajes con media
+        if message.media_type:
+            print(f"📎 API devolviendo mensaje con media - ID: {message.id}, tipo: {message.media_type}, external_id: {message.external_id}, media_url: {message.media_url}, media_route: {msg_dict.get('media_route')}")
+        serialized.append(msg_dict)
         last_id = max(last_id, message.id)
         if mark_read and message.sender_type == 'customer' and not message.is_read:
             message.is_read = True
