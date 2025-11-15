@@ -2160,6 +2160,8 @@ def webhook_whatsapp():
             archivo_url = None
             
             print(f"🔍 message_data keys: {list(message_data.keys())}")
+            type_message = message_data.get('typeMessage', '').lower()  # Convertir a minúsculas para comparación
+            print(f"🔍 typeMessage: '{message_data.get('typeMessage', '')}' (normalizado: '{type_message}')")
             
             if 'textMessageData' in message_data:
                 mensaje_texto = message_data['textMessageData'].get('textMessage', '')
@@ -2174,11 +2176,32 @@ def webhook_whatsapp():
                 archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
                 # Obtener idMessage desde diferentes ubicaciones posibles
                 id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
-                print(f"📷 Imagen recibida - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
+                print(f"📷 Imagen recibida (imageMessageData) - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
                 # Si no hay caption, usar texto vacío (la imagen se mostrará por media_type)
                 if not mensaje_texto:
                     mensaje_texto = '[Imagen]'
                 # Si no hay downloadUrl, el external_id se usará para descargar después
+            elif 'fileMessageData' in message_data:
+                # Green-API puede enviar imágenes como fileMessageData con typeMessage='image'
+                file_data = message_data.get('fileMessageData', {})
+                # Verificar el tipo de mensaje
+                if type_message == 'image':
+                    mensaje_texto = file_data.get('caption', '') or ''
+                    tipo_mensaje = 'imagen'
+                    print(f"📷 Imagen recibida (fileMessageData) - typeMessage: 'image'")
+                else:
+                    mensaje_texto = file_data.get('caption', '') or '[Archivo]'
+                    tipo_mensaje = 'documento'  # Por defecto, tratar como documento
+                    print(f"📎 Archivo recibido (fileMessageData) - typeMessage: '{type_message}'")
+                
+                # Intentar obtener downloadUrl
+                archivo_url = file_data.get('downloadUrl', '')
+                # Obtener idMessage desde diferentes ubicaciones posibles
+                id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
+                print(f"📎 fileMessageData - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
+                # Si no hay caption y es imagen, usar placeholder
+                if tipo_mensaje == 'imagen' and not mensaje_texto:
+                    mensaje_texto = '[Imagen]'
             elif 'documentMessageData' in message_data:
                 mensaje_texto = message_data['documentMessageData'].get('caption', '')
                 tipo_mensaje = 'documento'
@@ -2232,10 +2255,12 @@ def webhook_whatsapp():
                 try:
                     # Obtener idMessage desde diferentes ubicaciones posibles (puede estar en mensaje_data o data)
                     id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
-                    # Si es una imagen y no tenemos idMessage, intentar obtenerlo del imageMessageData
+                    # Si es una imagen y no tenemos idMessage, intentar obtenerlo del imageMessageData o fileMessageData
                     if tipo_mensaje == 'imagen' and not id_message:
-                        image_data = message_data.get('imageMessageData', {})
+                        image_data = message_data.get('imageMessageData') or message_data.get('fileMessageData', {})
                         id_message = image_data.get('idMessage') or ''
+                    
+                    print(f"🔍 Antes de registrar - tipo_mensaje: {tipo_mensaje}, id_message: {id_message}, archivo_url: {archivo_url[:50] if archivo_url else 'N/A'}")
                     
                     _register_incoming_whatsapp_message(
                         chat_id_full,
