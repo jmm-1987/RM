@@ -82,8 +82,12 @@ ssl_mode = 'require' if os.environ.get('RENDER') else 'prefer'
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
     'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
+    'pool_size': 10,        # Conexiones base en el pool
+    'max_overflow': 20,     # Conexiones adicionales permitidas en picos
+    'pool_timeout': 30,     # Segundos de espera para obtener conexión
     'connect_args': {
-        'sslmode': ssl_mode
+        'sslmode': ssl_mode,
+        'connect_timeout': 10  # Timeout de conexión inicial
     }
 }
 
@@ -2547,9 +2551,28 @@ def whatsapp_conversation_detail(conversation_id):
 
 @app.get('/whatsapp/api/conversaciones')
 def whatsapp_api_conversations():
-    conversaciones = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).all()
-    data = [_conversation_to_dict(c) for c in conversaciones]
-    return jsonify({'conversations': data})
+    # Paginación para mejorar rendimiento con muchas conversaciones
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 50, type=int), 100)  # Máximo 100 por página
+    
+    pagination = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    
+    data = [_conversation_to_dict(c) for c in pagination.items]
+    return jsonify({
+        'conversations': data,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev
+        }
+    })
 
 
 @app.get('/whatsapp/api/conversaciones/<int:conversation_id>/mensajes')

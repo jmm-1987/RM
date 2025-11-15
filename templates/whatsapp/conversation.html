@@ -17,7 +17,7 @@
 <div class="card shadow-sm conversation-card">
     <div class="card-header">
         <h2 class="h5 mb-0">{{ conversation.contact_name or conversation.contact_number|chat_display }}</h2>
-        <small class="text-muted" id="conversation-updated">
+        <small class="text-dark" id="conversation-updated" style="color: #000 !important;">
             Última actualización: {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
         </small>
     </div>
@@ -270,6 +270,7 @@
                 }
                 if (payload.updated_at_human && updatedLabel) {
                     updatedLabel.textContent = "Última actualización: " + payload.updated_at_human;
+                    updatedLabel.style.color = "#000"; // Asegurar color negro
                 }
             })
             .catch((error) => {
