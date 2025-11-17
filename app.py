@@ -22,14 +22,54 @@ import os
 import threading
 import time as _time
 import requests
-from sqlalchemy import text, inspect
+from sqlalchemy import text, inspect, func, select, and_
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 import base64
 import io
 from zoneinfo import ZoneInfo
-from collections import UserDict
+from collections import UserDict, defaultdict
 
 app = Flask(__name__)
+
+# Rate limiting para webhooks - Protección contra spam
+# Estructura: {ip: [(timestamp1, timestamp2, ...)]}
+_webhook_rate_limit = defaultdict(list)
+_rate_limit_lock = threading.Lock()
+_RATE_LIMIT_WINDOW = 60  # Ventana de tiempo en segundos (1 minuto)
+_RATE_LIMIT_MAX_REQUESTS = 100  # Máximo de requests por ventana de tiempo
+
+def _check_rate_limit(ip_address: str) -> bool:
+    """
+    Verifica si una IP ha excedido el límite de rate.
+    Retorna True si está permitido, False si excedió el límite.
+    """
+    current_time = _time.time()
+    
+    with _rate_limit_lock:
+        # Limpiar timestamps antiguos (fuera de la ventana)
+        _webhook_rate_limit[ip_address] = [
+            ts for ts in _webhook_rate_limit[ip_address]
+            if current_time - ts < _RATE_LIMIT_WINDOW
+        ]
+        
+        # Verificar si excedió el límite
+        if len(_webhook_rate_limit[ip_address]) >= _RATE_LIMIT_MAX_REQUESTS:
+            return False
+        
+        # Registrar esta solicitud
+        _webhook_rate_limit[ip_address].append(current_time)
+        return True
+
+def _get_client_ip() -> str:
+    """Obtiene la IP del cliente, considerando proxies"""
+    if request.headers.get('X-Forwarded-For'):
+        # Si hay X-Forwarded-For, tomar la primera IP (cliente real)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr or 'unknown'
 
 # Configuración general
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
@@ -2152,6 +2192,15 @@ def eliminar_plantillas_temporales():
 @app.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
     """Webhook para recibir mensajes de Green-API"""
+    # Rate limiting: Protección contra spam
+    client_ip = _get_client_ip()
+    if not _check_rate_limit(client_ip):
+        print(f"⚠️ Rate limit excedido para IP: {client_ip}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Rate limit exceeded. Too many requests.'
+        }), 429  # HTTP 429: Too Many Requests
+    
     try:
         data = request.get_json(silent=True) or {}
         
@@ -2453,7 +2502,23 @@ def ver_conversacion(mensaje_id):
 @app.route('/whatsapp')
 @login_required
 def whatsapp_dashboard():
-    conversaciones = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).all()
+    # Ordenar por el último mensaje (sent_at) en lugar de updated_at
+    # Usar subconsulta para obtener el último sent_at de cada conversación
+    last_message_subquery = db.session.query(
+        WhatsAppMessage.conversation_id,
+        func.max(WhatsAppMessage.sent_at).label('last_sent_at')
+    ).group_by(WhatsAppMessage.conversation_id).subquery()
+    
+    conversaciones = db.session.query(WhatsAppConversation)\
+        .outerjoin(
+            last_message_subquery,
+            WhatsAppConversation.id == last_message_subquery.c.conversation_id
+        )\
+        .order_by(
+            func.coalesce(last_message_subquery.c.last_sent_at, WhatsAppConversation.updated_at).desc(),
+            WhatsAppConversation.id.desc()
+        )\
+        .all()
     return render_template('whatsapp/index.html', conversaciones=conversaciones)
 
 
@@ -2551,28 +2616,122 @@ def whatsapp_conversation_detail(conversation_id):
 
 @app.get('/whatsapp/api/conversaciones')
 def whatsapp_api_conversations():
-    # Paginación para mejorar rendimiento con muchas conversaciones
-    page = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 50, type=int), 100)  # Máximo 100 por página
+    # Optimización: Usar subconsulta para obtener el último mensaje de cada conversación
+    # y ordenar por el sent_at del último mensaje (no por updated_at)
     
-    pagination = WhatsAppConversation.query.order_by(WhatsAppConversation.updated_at.desc()).paginate(
-        page=page, 
-        per_page=per_page, 
-        error_out=False
-    )
+    # Subconsulta para obtener el último sent_at de cada conversación
+    last_message_subquery = db.session.query(
+        WhatsAppMessage.conversation_id,
+        func.max(WhatsAppMessage.sent_at).label('last_sent_at')
+    ).group_by(WhatsAppMessage.conversation_id).subquery()
     
-    data = [_conversation_to_dict(c) for c in pagination.items]
-    return jsonify({
-        'conversations': data,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total': pagination.total,
-            'pages': pagination.pages,
-            'has_next': pagination.has_next,
-            'has_prev': pagination.has_prev
-        }
-    })
+    # Obtener conversaciones ordenadas por el último mensaje (sent_at)
+    conversations = db.session.query(WhatsAppConversation)\
+        .outerjoin(
+            last_message_subquery,
+            WhatsAppConversation.id == last_message_subquery.c.conversation_id
+        )\
+        .order_by(
+            func.coalesce(last_message_subquery.c.last_sent_at, WhatsAppConversation.updated_at).desc(),
+            WhatsAppConversation.id.desc()
+        )\
+        .all()
+    
+    # Pre-cargar unread counts con una sola query para todas las conversaciones
+    conversation_ids = [c.id for c in conversations]
+    unread_counts = {}
+    if conversation_ids:
+        unread_results = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.count(WhatsAppMessage.id).label('unread')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids),
+            WhatsAppMessage.sender_type == 'customer',
+            WhatsAppMessage.is_read == False
+        ).group_by(WhatsAppMessage.conversation_id).all()
+        
+        unread_counts = {conv_id: count for conv_id, count in unread_results}
+    
+    # Pre-cargar últimos mensajes con una sola query
+    last_messages = {}
+    if conversation_ids:
+        # Obtener el último mensaje de cada conversación
+        last_msg_subquery = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.max(WhatsAppMessage.sent_at).label('max_sent_at'),
+            func.max(WhatsAppMessage.id).label('max_id')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids)
+        ).group_by(WhatsAppMessage.conversation_id).subquery()
+        
+        last_msgs = db.session.query(WhatsAppMessage)\
+            .join(
+                last_msg_subquery,
+                and_(
+                    WhatsAppMessage.conversation_id == last_msg_subquery.c.conversation_id,
+                    WhatsAppMessage.sent_at == last_msg_subquery.c.max_sent_at,
+                    WhatsAppMessage.id == last_msg_subquery.c.max_id
+                )
+            )\
+            .all()
+        
+        last_messages = {msg.conversation_id: msg for msg in last_msgs}
+    
+    # Pre-cargar últimos mensajes de agentes
+    last_agent_messages = {}
+    if conversation_ids:
+        last_agent_subquery = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.max(WhatsAppMessage.sent_at).label('max_sent_at'),
+            func.max(WhatsAppMessage.id).label('max_id')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids),
+            WhatsAppMessage.sender_type == 'agent'
+        ).group_by(WhatsAppMessage.conversation_id).subquery()
+        
+        last_agents = db.session.query(WhatsAppMessage)\
+            .options(joinedload(WhatsAppMessage.usuario))\
+            .join(
+                last_agent_subquery,
+                and_(
+                    WhatsAppMessage.conversation_id == last_agent_subquery.c.conversation_id,
+                    WhatsAppMessage.sent_at == last_agent_subquery.c.max_sent_at,
+                    WhatsAppMessage.id == last_agent_subquery.c.max_id
+                )
+            )\
+            .all()
+        
+        last_agent_messages = {msg.conversation_id: msg for msg in last_agents}
+    
+    # Construir respuesta optimizada sin N+1 queries
+    data = []
+    for conv in conversations:
+        last_msg = last_messages.get(conv.id)
+        last_agent = last_agent_messages.get(conv.id)
+        
+        last_usuario = None
+        if last_agent and last_agent.usuario:
+            last_usuario = {
+                "id": last_agent.usuario.id,
+                "username": last_agent.usuario.username,
+                "color": last_agent.usuario.color or "#007bff",
+            }
+        
+        data.append({
+            "id": conv.id,
+            "display_name": conv.contact_name or _chat_display(conv.contact_number),
+            "contact_number": conv.contact_number,
+            "last_message_text": last_msg.message_text if last_msg else "",
+            "last_message_sender": last_msg.sender_type if last_msg else None,
+            "last_media_type": last_msg.media_type if last_msg else None,
+            "last_usuario": last_usuario,
+            "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
+            "updated_at_human": _to_local_time(conv.updated_at).strftime("%d/%m/%Y %H:%M") if conv.updated_at else "",
+            "unread_count": unread_counts.get(conv.id, 0),
+            "url": url_for("whatsapp_conversation_detail", conversation_id=conv.id),
+        })
+    
+    return jsonify({'conversations': data})
 
 
 @app.get('/whatsapp/api/conversaciones/<int:conversation_id>/mensajes')
