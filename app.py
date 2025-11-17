@@ -818,9 +818,11 @@ def generar_enlace_web():
 
 @app.route('/')
 def index():
-    ofertas_destacadas = Oferta.query.filter_by(activa=True, destacada=True).order_by(Oferta.created_at.desc()).limit(3).all()
-    ofertas_normales = Oferta.query.filter_by(activa=True, destacada=False).order_by(Oferta.created_at.desc()).limit(6).all()
-    return render_template('index.html', ofertas_destacadas=ofertas_destacadas, ofertas_normales=ofertas_normales)
+    # Redirigir a login si el usuario no está autenticado
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+    # Si está autenticado, redirigir al panel
+    return redirect(url_for('panel'))
 
 @app.route('/clientes')
 @login_required
