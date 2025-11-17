@@ -2527,20 +2527,32 @@ def whatsapp_dashboard():
 @app.route('/whatsapp/conversaciones/nueva', methods=['GET', 'POST'])
 @login_required
 def whatsapp_new_conversation():
+    # Obtener todos los clientes activos para mostrar en el selector
+    clientes = Cliente.query.filter_by(activo=True).order_by(Cliente.nombre.asc()).all()
+    
     if request.method == 'POST':
         raw_number = (request.form.get('contact_number') or '').strip()
         contact_name = (request.form.get('contact_name') or '').strip() or None
         initial_message = (request.form.get('initial_message') or '').strip()
+        
+        # Si se seleccionó un cliente del selector
+        selected_cliente_id = request.form.get('selected_cliente_id', type=int)
+        if selected_cliente_id:
+            cliente = Cliente.query.get(selected_cliente_id)
+            if cliente:
+                raw_number = cliente.telefono
+                if not contact_name:
+                    contact_name = cliente.nombre
 
         if not raw_number:
             flash('Debes indicar un número de WhatsApp', 'error')
-            return render_template('whatsapp/new_conversation.html')
+            return render_template('whatsapp/new_conversation.html', clientes=clientes)
 
         try:
             chat_id = _normalize_chat_id(raw_number)
         except ValueError as exc:
             flash(str(exc), 'error')
-            return render_template('whatsapp/new_conversation.html')
+            return render_template('whatsapp/new_conversation.html', clientes=clientes)
 
         existing = WhatsAppConversation.query.filter_by(contact_number=chat_id).first()
         if existing:
@@ -2555,7 +2567,7 @@ def whatsapp_new_conversation():
             except Exception as exc:  # noqa: BLE001
                 db.session.rollback()
                 flash(f'No fue posible enviar el mensaje inicial: {exc}', 'error')
-                return render_template('whatsapp/new_conversation.html')
+                return render_template('whatsapp/new_conversation.html', clientes=clientes)
 
             _append_whatsapp_message(
                 conversation,
@@ -2570,7 +2582,7 @@ def whatsapp_new_conversation():
         flash('Conversación creada correctamente.', 'success')
         return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
 
-    return render_template('whatsapp/new_conversation.html')
+    return render_template('whatsapp/new_conversation.html', clientes=clientes)
 
 
 @app.route('/whatsapp/conversaciones/<int:conversation_id>', methods=['GET', 'POST'])

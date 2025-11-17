@@ -2,13 +2,84 @@
 
 {% block title %}Nueva conversación | WhatsApp{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='whatsapp.css') }}">
+<style>
+    /* Estilos específicos para el select de contactos - fondo oscuro visible */
+    #contact_selector.form-select,
+    #contact_selector,
+    select#contact_selector {
+        background: #2a2a2a !important;
+        background-color: #2a2a2a !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        background-size: 16px 12px !important;
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 1;
+    }
+    
+    #contact_selector.form-select:focus,
+    #contact_selector:focus,
+    select#contact_selector:focus {
+        background: #333333 !important;
+        background-color: #333333 !important;
+        border-color: rgba(102, 126, 234, 0.5) !important;
+        color: #fff !important;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+        outline: none !important;
+    }
+    
+    /* Opciones del select - fondo oscuro y texto blanco */
+    #contact_selector option,
+    select#contact_selector option {
+        background: #1e1e1e !important;
+        background-color: #1e1e1e !important;
+        color: #fff !important;
+        padding: 8px !important;
+    }
+    
+    #contact_selector option:hover,
+    #contact_selector option:checked,
+    select#contact_selector option:hover,
+    select#contact_selector option:checked {
+        background: #1f8a70 !important;
+        background-color: #1f8a70 !important;
+        color: #fff !important;
+    }
+    
+    /* Asegurar que el texto seleccionado sea visible */
+    #contact_selector option:selected {
+        background: #1f8a70 !important;
+        background-color: #1f8a70 !important;
+        color: #fff !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-6">
+    <div class="col-lg-8">
         <h1 class="h3 mb-4">Iniciar nueva conversación</h1>
         <div class="card shadow-sm">
             <div class="card-body">
                 <form method="post">
+                    <div class="mb-3">
+                        <label for="contact_selector" class="form-label">Seleccionar contacto guardado</label>
+                        <select class="form-select" id="contact_selector" name="selected_cliente_id">
+                            <option value="">-- Selecciona un contacto o escribe manualmente --</option>
+                            {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}" data-telefono="{{ cliente.telefono }}" data-nombre="{{ cliente.nombre }}">
+                                {{ cliente.nombre }} - {{ cliente.telefono }}{% if cliente.zona %} ({{ cliente.zona.nombre }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Puedes seleccionar un contacto de la lista o escribir el número manualmente abajo.</div>
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="contact_number" class="form-label">Número de WhatsApp</label>
                         <input
@@ -42,14 +113,46 @@
 </div>
 <script>
 (function() {
-    const contactInput = document.getElementById("contact_number");
-    if (!contactInput) {
-        return;
+    const contactSelector = document.getElementById("contact_selector");
+    const contactNumberInput = document.getElementById("contact_number");
+    const contactNameInput = document.getElementById("contact_name");
+    
+    // Prevenir que clics fuera del select lo abran
+    document.addEventListener('click', function(e) {
+        if (contactSelector && !contactSelector.contains(e.target) && contactSelector !== e.target) {
+            // Si el clic no es en el select, cerrar cualquier dropdown abierto
+            contactSelector.blur();
+        }
+    }, true);
+    
+    if (contactSelector && contactNumberInput && contactNameInput) {
+        contactSelector.addEventListener("change", function(e) {
+            e.stopPropagation();
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.value) {
+                const telefono = selectedOption.dataset.telefono;
+                const nombre = selectedOption.dataset.nombre;
+                contactNumberInput.value = telefono || '';
+                contactNameInput.value = nombre || '';
+            }
+        });
+        
+        // Prevenir que el select se abra múltiples veces
+        contactSelector.addEventListener("mousedown", function(e) {
+            e.stopPropagation();
+        });
+        
+        contactSelector.addEventListener("click", function(e) {
+            e.stopPropagation();
+        });
     }
-
-    contactInput.addEventListener("blur", () => {
-        contactInput.value = contactInput.value.trim();
-    });
+    
+    const contactInput = document.getElementById("contact_number");
+    if (contactInput) {
+        contactInput.addEventListener("blur", () => {
+            contactInput.value = contactInput.value.trim();
+        });
+    }
 })();
 </script>
 {% endblock %}

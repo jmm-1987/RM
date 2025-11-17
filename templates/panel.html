@@ -12,20 +12,24 @@
     }
 
     .panel-tile {
-        background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(245,245,245,0.9));
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
         border-radius: 20px;
         padding: 2.5rem 2rem;
         text-align: center;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 1px solid rgba(255,255,255,0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         position: relative;
         overflow: hidden;
+        color: white;
     }
 
     .panel-tile:hover {
         transform: translateY(-10px);
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
     }
 
     .panel-tile i {
@@ -49,10 +53,11 @@
         font-size: 1.6rem;
         font-weight: 600;
         margin-bottom: 0.75rem;
+        color: white;
     }
 
     .panel-tile p {
-        color: #6c757d;
+        color: rgba(255, 255, 255, 0.7);
         margin-bottom: 1.5rem;
     }
 
@@ -62,14 +67,18 @@
         font-weight: 600;
         letter-spacing: 0.5px;
     }
+    
+    .panel-tile .text-muted {
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <div class="text-center">
-        <h1 class="display-6 fw-bold">Centro de control</h1>
-        <p class="text-muted mb-4">Selecciona el área en la que quieres trabajar</p>
+        <h1 class="display-6 fw-bold text-white">Centro de control</h1>
+        <p class="text-white-50 mb-4">Selecciona el área en la que quieres trabajar</p>
     </div>
 
     <div class="panel-hero">

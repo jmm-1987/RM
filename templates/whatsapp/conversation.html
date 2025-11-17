@@ -7,19 +7,24 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-    <a href="{{ url_for('whatsapp_dashboard') }}" class="btn btn-link ps-0">&larr; Volver</a>
-    <button class="btn btn-outline-success btn-sm" type="button" id="refresh-messages">
-        <i class="fas fa-sync-alt"></i> Refrescar
-    </button>
-</div>
-
 <div class="card shadow-sm conversation-card">
-    <div class="card-header">
-        <h2 class="h5 mb-0">{{ conversation.contact_name or conversation.contact_number|chat_display }}</h2>
-        <small class="text-dark" id="conversation-updated" style="color: #000 !important;">
-            Última actualización: {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
-        </small>
+    <div class="card-header" style="position: relative; background: linear-gradient(135deg, #1f8a70, #155f4b) !important;">
+        <!-- Botones dentro del header -->
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2" style="width: 100%; flex-wrap: nowrap;">
+            <a href="{{ url_for('whatsapp_dashboard') }}" class="btn btn-sm" style="background: rgba(255, 255, 255, 0.25) !important; color: #fff !important; border: 1px solid rgba(255, 255, 255, 0.4) !important; text-decoration: none !important; padding: 0.4rem 0.8rem; border-radius: 6px; white-space: nowrap;">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <button class="btn btn-outline-light btn-sm" type="button" id="refresh-messages" style="border-color: rgba(255, 255, 255, 0.6) !important; color: #fff !important; border-radius: 6px; white-space: nowrap;">
+                <i class="fas fa-sync-alt"></i> Refrescar
+            </button>
+        </div>
+        <!-- Nombre y última actualización en la misma línea -->
+        <div class="d-flex align-items-center gap-2 flex-wrap" style="width: 100%;">
+            <h2 class="h5 mb-0" style="color: #fff !important; margin: 0;">{{ conversation.contact_name or conversation.contact_number|chat_display }}</h2>
+            <small class="text-light" id="conversation-updated" style="color: rgba(255, 255, 255, 0.9) !important; margin: 0;">
+                Última actualización: {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "N/D" }}
+            </small>
+        </div>
     </div>
     <div
         class="card-body conversation-thread"
@@ -45,7 +50,7 @@
                         {% else %}
                             <span class="badge bg-success">{{ contact_label }}</span>
                         {% endif %}
-                        <small class="text-muted">{{ (message.sent_at | local_time).strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
+                        <small class="text-muted" style="color: {% if message.sender_type == 'agent' %}rgba(255, 255, 255, 0.9){% else %}#6c757d{% endif %} !important;">{{ (message.sent_at | local_time).strftime("%d/%m/%Y %H:%M") if message.sent_at else "" }}</small>
                     </div>
                     <div class="message-content">
                         {% if message.media_type %}
@@ -64,13 +69,13 @@
                                         <source src="{{ media_route }}">
                                         Tu navegador no soporta video.
                                     </video>
-                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar video</a></div>
+                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar video</a></div>
                                 {% elif message.media_type == 'audio' %}
                                     <audio controls class="audio-player">
                                         <source src="{{ media_route }}">
                                         Tu navegador no soporta audio.
                                     </audio>
-                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar audio</a></div>
+                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar audio</a></div>
                                 {% else %}
                                     <div class="attachment-chip">
                                         <i class="fas fa-paperclip"></i>
@@ -91,7 +96,7 @@
                 </div>
             {% endfor %}
         {% else %}
-            <p class="text-muted text-center">No hay mensajes en esta conversación.</p>
+            <p class="text-center" style="color: rgba(255, 255, 255, 0.7);">No hay mensajes en esta conversación.</p>
         {% endif %}
     </div>
     <div class="card-footer">
@@ -164,7 +169,14 @@
                     video.appendChild(videoSource);
                     mediaWrapper.appendChild(video);
                     const videoDownload = document.createElement("div");
-                    videoDownload.innerHTML = `<a href="${sourceUrl}" target="_blank" rel="noopener" download>Descargar video</a>`;
+                    const videoLink = document.createElement("a");
+                    videoLink.href = sourceUrl;
+                    videoLink.target = "_blank";
+                    videoLink.rel = "noopener";
+                    videoLink.download = "";
+                    videoLink.textContent = "Descargar video";
+                    videoLink.style.color = msg.sender_type === "agent" ? "#fff" : "#1f8a70";
+                    videoDownload.appendChild(videoLink);
                     mediaWrapper.appendChild(videoDownload);
                     break;
                 case "audio":
@@ -176,7 +188,14 @@
                     audio.appendChild(audioSource);
                     mediaWrapper.appendChild(audio);
                     const audioDownload = document.createElement("div");
-                    audioDownload.innerHTML = `<a href="${sourceUrl}" target="_blank" rel="noopener" download>Descargar audio</a>`;
+                    const audioLink = document.createElement("a");
+                    audioLink.href = sourceUrl;
+                    audioLink.target = "_blank";
+                    audioLink.rel = "noopener";
+                    audioLink.download = "";
+                    audioLink.textContent = "Descargar audio";
+                    audioLink.style.color = msg.sender_type === "agent" ? "#fff" : "#1f8a70";
+                    audioDownload.appendChild(audioLink);
                     mediaWrapper.appendChild(audioDownload);
                     break;
                 default:
@@ -216,6 +235,7 @@
 
         const timestamp = document.createElement("small");
         timestamp.className = "text-muted";
+        timestamp.style.color = msg.sender_type === "agent" ? "rgba(255, 255, 255, 0.9)" : "#6c757d";
         timestamp.textContent = msg.sent_at_human;
 
         meta.appendChild(badge);
@@ -270,7 +290,7 @@
                 }
                 if (payload.updated_at_human && updatedLabel) {
                     updatedLabel.textContent = "Última actualización: " + payload.updated_at_human;
-                    updatedLabel.style.color = "#000"; // Asegurar color negro
+                    updatedLabel.style.color = "rgba(255, 255, 255, 0.9)"; // Mantener color blanco
                 }
             })
             .catch((error) => {

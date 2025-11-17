@@ -22,20 +22,17 @@
         <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#contactsModal">
             <i class="fas fa-address-book"></i> Contactos
         </button>
-        <a href="{{ url_for('whatsapp_health_check') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-stethoscope"></i> Health check
-        </a>
     </div>
 </div>
 
-<div class="modal fade" id="contactsModal" tabindex="-1" aria-labelledby="contactsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
+<div class="modal fade" id="contactsModal" tabindex="-1" aria-labelledby="contactsModalLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" style="z-index: 1056;">
+        <div class="modal-content" style="z-index: 1057; position: relative;">
+            <div class="modal-header" style="pointer-events: auto;">
                 <h5 class="modal-title" id="contactsModalLabel">Contactos guardados</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar" style="pointer-events: auto;"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="pointer-events: auto;">
                 <div class="mb-3 d-none" id="contacts-search-wrapper">
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
@@ -63,6 +60,42 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Buscador de conversaciones -->
+<div class="mb-3">
+    <div class="input-group mb-2">
+        <span class="input-group-text" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;">
+            <i class="fas fa-search"></i>
+        </span>
+        <input 
+            type="search" 
+            class="form-control" 
+            id="conversation-search" 
+            placeholder="Buscar conversación por nombre del cliente..." 
+            autocomplete="off"
+            style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;"
+        >
+        <button 
+            class="btn btn-outline-secondary" 
+            type="button" 
+            id="clear-search"
+            style="border-color: rgba(255, 255, 255, 0.2); color: #fff; display: none;"
+        >
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="form-check">
+        <input 
+            class="form-check-input" 
+            type="checkbox" 
+            id="filter-unread" 
+            style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3);"
+        >
+        <label class="form-check-label" for="filter-unread" style="color: #fff; cursor: pointer;">
+            <i class="fas fa-envelope"></i> Mostrar solo conversaciones con mensajes no leídos
+        </label>
     </div>
 </div>
 
@@ -132,6 +165,11 @@
     const listWrapper = document.getElementById("conversation-list-wrapper");
     const listElement = document.getElementById("conversation-list");
     const emptyAlert = document.getElementById("conversation-empty");
+    const searchInput = document.getElementById("conversation-search");
+    const clearSearchBtn = document.getElementById("clear-search");
+    const filterUnreadCheckbox = document.getElementById("filter-unread");
+    
+    let allConversations = []; // Almacenar todas las conversaciones para filtrar
 
         if (!listElement) {
         return;
@@ -245,10 +283,77 @@
             })
             .then((payload) => {
                 if (Array.isArray(payload.conversations)) {
-                    renderConversations(payload.conversations);
+                    allConversations = payload.conversations; // Guardar todas las conversaciones
+                    filterConversations(); // Aplicar filtro si hay búsqueda activa
                 }
             })
             .catch((error) => console.error(error));
+    }
+
+    function filterConversations() {
+        let filtered = allConversations;
+        
+        // Filtrar por término de búsqueda
+        if (searchInput) {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            
+            // Mostrar/ocultar botón de limpiar búsqueda
+            if (searchTerm) {
+                clearSearchBtn.style.display = 'block';
+            } else {
+                clearSearchBtn.style.display = 'none';
+            }
+            
+            if (searchTerm) {
+                // Filtrar conversaciones por nombre del cliente
+                filtered = filtered.filter(conversation => {
+                    const displayName = (conversation.display_name || '').toLowerCase();
+                    return displayName.includes(searchTerm);
+                });
+            }
+        }
+        
+        // Filtrar por mensajes no leídos si el checkbox está activado
+        if (filterUnreadCheckbox && filterUnreadCheckbox.checked) {
+            filtered = filtered.filter(conversation => {
+                return conversation.unread_count && conversation.unread_count > 0;
+            });
+        }
+        
+        renderConversations(filtered);
+    }
+
+    // Búsqueda dinámica mientras el usuario escribe
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterConversations();
+        });
+        
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                filterConversations();
+                searchInput.blur();
+            }
+        });
+    }
+
+    // Botón para limpiar búsqueda
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', function() {
+            if (searchInput) {
+                searchInput.value = '';
+                filterConversations();
+                searchInput.focus();
+            }
+        });
+    }
+
+    // Checkbox para filtrar solo no leídos
+    if (filterUnreadCheckbox) {
+        filterUnreadCheckbox.addEventListener('change', function() {
+            filterConversations();
+        });
     }
 
     setInterval(fetchConversations, 5000);
