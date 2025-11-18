@@ -2510,8 +2510,8 @@ def ver_conversacion(mensaje_id):
 @app.route('/whatsapp')
 @login_required
 def whatsapp_dashboard():
+    # Optimización: Pre-cargar todos los datos necesarios en una sola pasada para evitar N+1 queries
     # Ordenar por el último mensaje (sent_at) en lugar de updated_at
-    # Usar subconsulta para obtener el último sent_at de cada conversación
     last_message_subquery = db.session.query(
         WhatsAppMessage.conversation_id,
         func.max(WhatsAppMessage.sent_at).label('last_sent_at')
@@ -2527,6 +2527,75 @@ def whatsapp_dashboard():
             WhatsAppConversation.id.desc()
         )\
         .all()
+    
+    # Pre-cargar datos para evitar N+1 queries en el template
+    conversation_ids = [c.id for c in conversaciones]
+    last_messages_dict = {}
+    unread_counts_dict = {}
+    last_agent_messages_dict = {}
+    
+    if conversation_ids:
+        # Últimos mensajes
+        last_msg_subquery = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.max(WhatsAppMessage.sent_at).label('max_sent_at'),
+            func.max(WhatsAppMessage.id).label('max_id')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids)
+        ).group_by(WhatsAppMessage.conversation_id).subquery()
+        
+        last_msgs = db.session.query(WhatsAppMessage)\
+            .join(
+                last_msg_subquery,
+                and_(
+                    WhatsAppMessage.conversation_id == last_msg_subquery.c.conversation_id,
+                    WhatsAppMessage.sent_at == last_msg_subquery.c.max_sent_at,
+                    WhatsAppMessage.id == last_msg_subquery.c.max_id
+                )
+            )\
+            .all()
+        last_messages_dict = {msg.conversation_id: msg for msg in last_msgs}
+        
+        # Unread counts
+        unread_results = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.count(WhatsAppMessage.id).label('unread')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids),
+            WhatsAppMessage.sender_type == 'customer',
+            WhatsAppMessage.is_read == False
+        ).group_by(WhatsAppMessage.conversation_id).all()
+        unread_counts_dict = {conv_id: count for conv_id, count in unread_results}
+        
+        # Últimos mensajes de agentes
+        last_agent_subquery = db.session.query(
+            WhatsAppMessage.conversation_id,
+            func.max(WhatsAppMessage.sent_at).label('max_sent_at'),
+            func.max(WhatsAppMessage.id).label('max_id')
+        ).filter(
+            WhatsAppMessage.conversation_id.in_(conversation_ids),
+            WhatsAppMessage.sender_type == 'agent'
+        ).group_by(WhatsAppMessage.conversation_id).subquery()
+        
+        last_agents = db.session.query(WhatsAppMessage)\
+            .options(joinedload(WhatsAppMessage.usuario))\
+            .join(
+                last_agent_subquery,
+                and_(
+                    WhatsAppMessage.conversation_id == last_agent_subquery.c.conversation_id,
+                    WhatsAppMessage.sent_at == last_agent_subquery.c.max_sent_at,
+                    WhatsAppMessage.id == last_agent_subquery.c.max_id
+                )
+            )\
+            .all()
+        last_agent_messages_dict = {msg.conversation_id: msg for msg in last_agents}
+    
+    # Añadir datos pre-cargados a cada conversación como atributos temporales
+    for conv in conversaciones:
+        conv._last_message = last_messages_dict.get(conv.id)
+        conv._unread_count = unread_counts_dict.get(conv.id, 0)
+        conv._last_agent_message = last_agent_messages_dict.get(conv.id)
+    
     return render_template('whatsapp/index.html', conversaciones=conversaciones)
 
 
@@ -2630,7 +2699,12 @@ def whatsapp_conversation_detail(conversation_id):
         db.session.commit()
         conversation = WhatsAppConversation.query.get_or_404(conversation_id)
 
-    messages = conversation.messages.order_by(WhatsAppMessage.sent_at.asc(), WhatsAppMessage.id.asc()).all()
+    # Optimización: Pre-cargar usuarios para evitar N+1 queries
+    messages = db.session.query(WhatsAppMessage)\
+        .filter(WhatsAppMessage.conversation_id == conversation.id)\
+        .options(joinedload(WhatsAppMessage.usuario))\
+        .order_by(WhatsAppMessage.sent_at.asc(), WhatsAppMessage.id.asc())\
+        .all()
     return render_template('whatsapp/conversation.html', conversation=conversation, messages=messages)
 
 
@@ -2763,7 +2837,7 @@ def whatsapp_api_conversation_messages(conversation_id):
     query = WhatsAppMessage.query.filter(
         WhatsAppMessage.conversation_id == conversation.id,
         WhatsAppMessage.id > after_id,
-    ).order_by(WhatsAppMessage.id.asc())
+    ).order_by(WhatsAppMessage.id.asc()).options(joinedload(WhatsAppMessage.usuario))
 
     messages = query.all()
     changed = False
@@ -2772,9 +2846,7 @@ def whatsapp_api_conversation_messages(conversation_id):
 
     for message in messages:
         msg_dict = _message_to_dict(message)
-        # Log para debugging de mensajes con media
-        if message.media_type:
-            print(f"📎 API devolviendo mensaje con media - ID: {message.id}, tipo: {message.media_type}, external_id: {message.external_id}, media_url: {message.media_url}, media_route: {msg_dict.get('media_route')}")
+        # Log removido para mejorar rendimiento
         serialized.append(msg_dict)
         last_id = max(last_id, message.id)
         if mark_read and message.sender_type == 'customer' and not message.is_read:

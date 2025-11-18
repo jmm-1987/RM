@@ -102,13 +102,13 @@
 <div id="conversation-list-wrapper" class="{% if not conversaciones %}d-none{% endif %}">
     <div id="conversation-list" class="conversation-grid">
         {% for conversation in conversaciones %}
-            {% set last = conversation.last_message() %}
-            {% set unread = conversation.unread_count() %}
+            {% set last = conversation._last_message %}
+            {% set unread = conversation._unread_count %}
             <a class="conversation-tile" href="{{ url_for('whatsapp_conversation_detail', conversation_id=conversation.id) }}">
                 <div class="tile-header d-flex justify-content-between align-items-center">
                     <div class="tile-name">{{ conversation.contact_name or conversation.contact_number|chat_display }}</div>
                     <div class="d-flex align-items-center gap-2">
-                        {% set last_agent = conversation.last_agent_message() %}
+                        {% set last_agent = conversation._last_agent_message %}
                         {% if last_agent and last_agent.usuario %}
                             <span class="badge" style="background-color: {{ last_agent.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
                                 <i class="fas fa-user"></i> {{ last_agent.usuario.username }}
@@ -323,10 +323,14 @@
         renderConversations(filtered);
     }
 
-    // Búsqueda dinámica mientras el usuario escribe
+    // Búsqueda dinámica con debounce para mejor rendimiento
+    let searchTimeout;
     if (searchInput) {
         searchInput.addEventListener('input', function() {
-            filterConversations();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                filterConversations();
+            }, 300); // Esperar 300ms después de que el usuario deje de escribir
         });
         
         searchInput.addEventListener('keydown', function(e) {
@@ -356,7 +360,7 @@
         });
     }
 
-    setInterval(fetchConversations, 5000);
+    setInterval(fetchConversations, 12000); // Reducido de 5s a 12s para mejor rendimiento
     const refreshBtn = document.getElementById("refresh-conversations");
     if (refreshBtn) {
         refreshBtn.addEventListener("click", () => {
