@@ -2182,7 +2182,6 @@ def webhook_whatsapp():
     
     try:
         # Twilio envía datos como form-urlencoded o JSON
-        # Intentar obtener datos de ambos formatos
         if request.is_json:
             data = request.get_json(silent=True) or {}
         else:
