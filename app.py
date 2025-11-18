@@ -2039,6 +2039,16 @@ def diagnostico_twilio():
             'whatsapp_number': TWILIO_WHATSAPP_NUMBER or 'No configurado'
         }
         
+        # Verificar formato del número
+        if TWILIO_WHATSAPP_NUMBER:
+            if not TWILIO_WHATSAPP_NUMBER.startswith('whatsapp:'):
+                diagnostico['advertencias'] = diagnostico.get('advertencias', [])
+                diagnostico['advertencias'].append(
+                    f"⚠️ El número de WhatsApp debe empezar con 'whatsapp:'. "
+                    f"Actual: {TWILIO_WHATSAPP_NUMBER}. "
+                    f"Formato correcto: whatsapp:+34612345678"
+                )
+        
         # Probar conexión
         conectado, mensaje = configurar_twilio(
             TWILIO_ACCOUNT_SID,
@@ -2050,6 +2060,18 @@ def diagnostico_twilio():
             'conectado': conectado,
             'mensaje': mensaje
         }
+        
+        # Intentar verificar el número en Twilio
+        if conectado and TWILIO_WHATSAPP_NUMBER:
+            try:
+                # Verificar que el número esté configurado correctamente
+                whatsapp_num = getattr(twilio_sender, 'whatsapp_number', None)
+                if whatsapp_num:
+                    diagnostico['numero_verificado'] = f"✅ Número configurado: {whatsapp_num}"
+                else:
+                    diagnostico['numero_verificado'] = "❌ Número no configurado en twilio_sender"
+            except Exception as e:
+                diagnostico['numero_verificado'] = f"⚠️ No se pudo verificar el número: {str(e)}"
         
         if conectado:
             diagnostico['estado'] = '✅ Conectado y funcionando'

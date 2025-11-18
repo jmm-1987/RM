@@ -138,13 +138,26 @@ class TwilioSender:
         Envío real usando Twilio
         """
         try:
-            if not self._client or not self.whatsapp_number:
-                error_msg = "Twilio no está configurado correctamente (falta Account SID, Auth Token o número de WhatsApp)"
+            if not self._client:
+                error_msg = "Cliente Twilio no inicializado"
+                logger.error(error_msg)
+                return False, error_msg
+            
+            if not self.whatsapp_number:
+                error_msg = "Número de WhatsApp no configurado. Configura TWILIO_WHATSAPP_NUMBER (formato: whatsapp:+34612345678)"
+                logger.error(error_msg)
+                return False, error_msg
+
+            # Verificar formato del número From
+            if not self.whatsapp_number.startswith('whatsapp:'):
+                error_msg = f"Formato incorrecto del número From. Debe empezar con 'whatsapp:'. Actual: {self.whatsapp_number}. Ejemplo correcto: whatsapp:+34612345678"
                 logger.error(error_msg)
                 return False, error_msg
 
             # Formatear número de teléfono para Twilio (formato: whatsapp:+34612345678)
             formatted_number = self._format_phone_number(phone_number)
+
+            logger.info(f"Enviando mensaje desde {self.whatsapp_number} a {formatted_number}")
 
             # Enviar mensaje usando Twilio
             message_obj = self._client.messages.create(
@@ -159,6 +172,15 @@ class TwilioSender:
         except TwilioRestException as e:
             error_msg = f"Error Twilio {e.code}: {e.msg}"
             logger.error(f"✗ Error enviando a {phone_number}: {error_msg}")
+            
+            # Mensajes de error más descriptivos
+            if e.code == 63007:
+                error_msg = f"Error 63007: El número 'From' ({self.whatsapp_number}) no está configurado o no existe en tu cuenta de Twilio. Verifica que el número esté correctamente configurado en el panel de Twilio y que uses el formato correcto (whatsapp:+34612345678). Si usas Sandbox, el número debe ser whatsapp:+14155238886"
+            elif e.code == 21211:
+                error_msg = f"Error 21211: Número de destino inválido ({formatted_number}). Verifica el formato del número."
+            elif e.code == 21608:
+                error_msg = f"Error 21608: No tienes permiso para enviar a este número. Si usas Sandbox, asegúrate de que el número esté verificado."
+            
             return False, error_msg
         except TwilioException as e:
             error_msg = f"Error de conexión Twilio: {str(e)}"
