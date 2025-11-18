@@ -2181,6 +2181,9 @@ def webhook_whatsapp():
         }), 429  # HTTP 429: Too Many Requests
     
     try:
+        # Detectar User-Agent para identificar el origen
+        user_agent = request.headers.get('User-Agent', '')
+        
         # Twilio envía datos como form-urlencoded o JSON
         if request.is_json:
             data = request.get_json(silent=True) or {}
@@ -2190,6 +2193,17 @@ def webhook_whatsapp():
         
         if not data:
             return jsonify({'status': 'error', 'message': 'No data received'}), 400
+        
+        # Detectar si es Green-API (legacy) y rechazarlo explícitamente
+        is_green_api = 'GREEN-API' in user_agent or 'typeWebhook' in data or 'instanceData' in data
+        
+        if is_green_api:
+            print(f"⚠️ Webhook Green-API rechazado - keys: {list(data.keys())}")
+            print(f"⚠️ Este webhook solo acepta mensajes de Twilio. Por favor, desactiva el webhook de Green-API.")
+            return jsonify({
+                'status': 'error',
+                'message': 'Green-API webhooks are no longer supported. This endpoint only accepts Twilio webhooks. Please disable Green-API webhook and configure Twilio instead.'
+            }), 400
         
         # Log del payload completo para debugging
         print(f"🔍 Webhook Twilio recibido - keys: {list(data.keys())}")
@@ -2215,7 +2229,8 @@ def webhook_whatsapp():
             telefono_remitente = from_number.replace('+', '')
         
         if not telefono_remitente:
-            return jsonify({'status': 'error', 'message': 'No sender number'}), 400
+            print(f"⚠️ Webhook recibido sin número de remitente - keys: {list(data.keys())}")
+            return jsonify({'status': 'error', 'message': 'No sender number (From field missing). This endpoint only accepts Twilio webhooks.'}), 400
         
         # Determinar tipo de mensaje y media
         mensaje_texto = message_body or ''
