@@ -92,7 +92,7 @@
         
         <div class="card">
             <div class="card-header">
-                <h5><i class="fab fa-whatsapp text-success"></i> Estado de Green-API</h5>
+                <h5><i class="fab fa-whatsapp text-success"></i> Estado de Twilio</h5>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -119,27 +119,23 @@
                 <!-- Información de la API -->
                 <div class="row">
                     <div class="col-12">
-                        <h6><i class="fas fa-info-circle"></i> Información de la Instancia:</h6>
+                        <h6><i class="fas fa-info-circle"></i> Información de la Cuenta:</h6>
                         <div class="table-responsive">
                             <table class="table table-sm">
                                 <tbody>
                                     <tr>
-                                        <td><strong>URL de la API:</strong></td>
-                                        <td><code>{{ config.url }}</code></td>
+                                        <td><strong>Account SID:</strong></td>
+                                        <td><code>{{ config.account_sid }}</code></td>
                                     </tr>
                                     <tr>
-                                        <td><strong>ID de Instancia:</strong></td>
-                                        <td><code>{{ config.instance_id }}</code></td>
+                                        <td><strong>Número de WhatsApp:</strong></td>
+                                        <td><code>{{ config.whatsapp_number }}</code></td>
                                     </tr>
                                     <tr>
-                                        <td><strong>Número de Teléfono:</strong></td>
-                                        <td><code>{{ config.phone }}</code></td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Token:</strong></td>
+                                        <td><strong>Auth Token:</strong></td>
                                         <td>
-                                            <code>{{ config.token }}</code>
-                                            {% if config.token != 'No configurado' %}
+                                            <code>{{ config.auth_token }}</code>
+                                            {% if config.auth_token != 'No configurado' %}
                                             <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copiarToken()">
                                                 <i class="fas fa-copy"></i>
                                             </button>
@@ -155,8 +151,8 @@
                 <hr>
                 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-start">
-                    <a href="{{ url_for('configurar_green_api_route') }}" class="btn btn-primary">
-                        <i class="fas fa-edit"></i> Configurar Green-API
+                    <a href="{{ url_for('configurar_twilio_route') }}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> Configurar Twilio
                     </a>
                     <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#testModal">
                         <i class="fas fa-paper-plane"></i> Enviar Prueba
@@ -164,7 +160,7 @@
                     <button type="button" class="btn btn-success" onclick="verificarEstado()">
                         <i class="fas fa-sync"></i> Verificar Estado
                     </button>
-                    <a href="{{ url_for('diagnostico_green_api') }}" class="btn btn-warning">
+                    <a href="{{ url_for('diagnostico_twilio') }}" class="btn btn-warning">
                         <i class="fas fa-stethoscope"></i> Ejecutar Diagnóstico
                     </a>
                 </div>
@@ -173,30 +169,32 @@
         
         <div class="card mt-4">
             <div class="card-header">
-                <h5><i class="fas fa-info-circle"></i> Información sobre Green-API</h5>
+                <h5><i class="fas fa-info-circle"></i> Información sobre Twilio</h5>
             </div>
             <div class="card-body">
-                <h6>¿Qué es Green-API?</h6>
-                <p>Green-API es un servicio que permite enviar mensajes de WhatsApp de forma automatizada a través de su API REST.</p>
+                <h6>¿Qué es Twilio?</h6>
+                <p>Twilio es una plataforma de comunicaciones en la nube que permite enviar mensajes de WhatsApp de forma automatizada a través de su API.</p>
                 
                 <h6>Configuración necesaria:</h6>
                 <ul>
-                    <li><strong>API URL:</strong> La URL de tu instancia (ej: https://7107.api.green-api.com)</li>
-                    <li><strong>API Token:</strong> El token de autenticación de tu instancia</li>
+                    <li><strong>Account SID:</strong> Identificador único de tu cuenta de Twilio</li>
+                    <li><strong>Auth Token:</strong> Token de autenticación de tu cuenta</li>
+                    <li><strong>Número de WhatsApp:</strong> Número de WhatsApp Business (formato: whatsapp:+34612345678)</li>
                 </ul>
                 
                 <h6>Pasos para configurar:</h6>
                 <ol>
-                    <li>Accede a tu panel de Green-API</li>
-                    <li>Copia la URL de tu instancia</li>
-                    <li>Copia el token de autenticación</li>
+                    <li>Accede a tu panel de Twilio: https://console.twilio.com</li>
+                    <li>En el Dashboard, copia el Account SID y Auth Token</li>
+                    <li>Obtén tu número de WhatsApp (Sandbox para pruebas o número de producción)</li>
                     <li>Configura estos datos en el sistema</li>
+                    <li>Configura el webhook en Twilio apuntando a: <code>https://tu-dominio.com/webhook/whatsapp</code></li>
                     <li>Realiza una prueba de envío</li>
                 </ol>
                 
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Importante:</strong> Asegúrate de que tu instancia de Green-API esté autorizada y funcionando correctamente.
+                    <strong>Importante:</strong> Para números de prueba (Sandbox), solo puedes enviar a números verificados. Para producción, necesitas un número de WhatsApp Business aprobado por Twilio.
                 </div>
             </div>
         </div>
@@ -253,7 +251,7 @@
                 
                 <div class="text-center">
                     <p class="small text-muted mb-2">¿No llegan los mensajes de WhatsApp?</p>
-                    <a href="{{ url_for('diagnostico_green_api') }}" class="btn btn-warning btn-sm">
+                    <a href="{{ url_for('diagnostico_twilio') }}" class="btn btn-warning btn-sm">
                         <i class="fas fa-stethoscope"></i> Ejecutar Diagnóstico Completo
                     </a>
                 </div>
@@ -272,7 +270,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('test_green_api') }}">
+            <form method="POST" action="{{ url_for('test_twilio') }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="numero_test" class="form-label">Número de Teléfono:</label>

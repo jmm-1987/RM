@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Configurar Twilio{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-edit"></i> Configurar Twilio</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fab fa-whatsapp text-success"></i> Datos de Configuración</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="account_sid" class="form-label">Account SID:</label>
+                        <input type="text" class="form-control" id="account_sid" name="account_sid" 
+                               placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="{{ config.account_sid }}" required>
+                        <div class="form-text">Account SID de tu cuenta de Twilio (visible en el Dashboard)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="auth_token" class="form-label">Auth Token:</label>
+                        <input type="password" class="form-control" id="auth_token" name="auth_token" 
+                               placeholder="Tu Auth Token de Twilio" value="{{ config.auth_token }}" required>
+                        <div class="form-text">Auth Token de tu cuenta de Twilio (haz clic en el ojo para verlo en el Dashboard)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="whatsapp_number" class="form-label">Número de WhatsApp:</label>
+                        <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" 
+                               placeholder="whatsapp:+34612345678" value="{{ config.whatsapp_number }}" required>
+                        <div class="form-text">Número de WhatsApp Business (formato: whatsapp:+34612345678). Para pruebas usa el número del Sandbox.</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Información:</strong> Estos datos se pueden encontrar en tu panel de Twilio en el Dashboard.
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('configuracion') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Configuración
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-question-circle"></i> ¿Dónde encontrar estos datos?</h5>
+            </div>
+            <div class="card-body">
+                <h6>1. Accede a tu panel de Twilio</h6>
+                <p class="small">Ve a <a href="https://console.twilio.com" target="_blank">console.twilio.com</a></p>
+                
+                <h6>2. En el Dashboard encontrarás:</h6>
+                <ul class="small">
+                    <li><strong>Account SID:</strong> Visible en la parte superior</li>
+                    <li><strong>Auth Token:</strong> Haz clic en el icono del ojo 👁️ para mostrarlo</li>
+                </ul>
+                
+                <h6>3. Obtén tu número de WhatsApp</h6>
+                <p class="small">Para pruebas: Ve a <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank">WhatsApp Sandbox</a> y únete al Sandbox. El número será algo como <code>whatsapp:+14155238886</code></p>
+                <p class="small">Para producción: Solicita un número de WhatsApp Business en el panel de Twilio.</p>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Importante:</strong> El número debe estar en formato <code>whatsapp:+34612345678</code> (con prefijo whatsapp: y código de país).
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-lightbulb"></i> Consejos</h5>
+            </div>
+            <div class="card-body">
+                <ul class="small">
+                    <li>El Account SID empieza con "AC"</li>
+                    <li>El Auth Token es sensible, no lo compartas</li>
+                    <li>Para números de prueba, solo puedes enviar a números verificados en el Sandbox</li>
+                    <li>Configura el webhook en Twilio apuntando a: <code>https://tu-dominio.com/webhook/whatsapp</code></li>
+                    <li>Después de configurar, haz una prueba</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Enlace de diagnóstico -->
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-stethoscope"></i> Diagnóstico</h5>
+            </div>
+            <div class="card-body text-center">
+                <p>Si tienes problemas con los mensajes de WhatsApp, ejecuta el diagnóstico:</p>
+                <a href="{{ url_for('diagnostico_twilio') }}" class="btn btn-info">
+                    <i class="fas fa-stethoscope"></i> Ejecutar Diagnóstico
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

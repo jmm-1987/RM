@@ -27,11 +27,10 @@ if not DATABASE_URL.startswith(('postgresql://', 'postgres://')):
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-# Configuración de Green-API desde variables de entorno
-GREEN_API_URL = os.environ.get('GREEN_API_URL', 'https://7107.api.green-api.com')
-GREEN_API_TOKEN = os.environ.get('GREEN_API_TOKEN', '3dd7b31137204b0ca3c233fd4f7ebda4cb0f594076244419ba')
-GREEN_API_INSTANCE_ID = os.environ.get('GREEN_API_INSTANCE_ID', '7107349111')
-GREEN_API_PHONE = os.environ.get('GREEN_API_PHONE', '34625433667')
+# Configuración de Twilio desde variables de entorno
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_WHATSAPP_NUMBER = os.environ.get('TWILIO_WHATSAPP_NUMBER', '')  # Formato: whatsapp:+34612345678
 
 # Configuración de la aplicación
 SECRET_KEY = os.environ.get('SECRET_KEY', 'clave-secreta-para-produccion-cambiar')

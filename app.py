@@ -16,7 +16,7 @@ from models import (
     WhatsAppMessage,
     Usuario,
 )
-from whatsapp_sender import enviar_whatsapp, configurar_green_api, green_api_sender
+from twilio_sender import enviar_whatsapp, configurar_twilio, twilio_sender
 from datetime import datetime, date, timezone
 import os
 import threading
@@ -299,50 +299,40 @@ def _normalize_chat_id(raw_number: str) -> str:
     return f"{digits}@c.us"
 
 
-def _green_api_credentials():
-    api_url = getattr(green_api_sender, "api_url", None)
-    api_token = getattr(green_api_sender, "api_token", None)
-    instance_id = getattr(green_api_sender, "instance_id", None)
+def _twilio_credentials():
+    account_sid = getattr(twilio_sender, "account_sid", None)
+    auth_token = getattr(twilio_sender, "auth_token", None)
+    whatsapp_number = getattr(twilio_sender, "whatsapp_number", None)
 
-    if green_api_sender.simulate_mode or not all([api_url, api_token, instance_id]):
-        raise RuntimeError("Green-API no está configurado para envíos reales")
+    if twilio_sender.simulate_mode or not all([account_sid, auth_token, whatsapp_number]):
+        raise RuntimeError("Twilio no está configurado para envíos reales")
 
-    return api_url, api_token, instance_id
-
-
-def _send_green_api_message(chat_id: str, message: str) -> str | None:
-    api_url, api_token, instance_id = _green_api_credentials()
-    normalized_chat_id = _normalize_chat_id(chat_id)
-    url = f"{api_url}/waInstance{instance_id}/sendMessage/{api_token}"
-    response = requests.post(
-        url,
-        json={"chatId": normalized_chat_id, "message": message},
-        timeout=30,
-    )
-    response.raise_for_status()
-
-    if response.headers.get("content-type", "").startswith("application/json"):
-        data = response.json()
-        return data.get("idMessage")
-    return None
+    return account_sid, auth_token, whatsapp_number
 
 
-def _fetch_green_api_contacts() -> list[dict]:
-    api_url, api_token, instance_id = _green_api_credentials()
-    url = f"{api_url}/waInstance{instance_id}/getContacts/{api_token}"
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-    if isinstance(data, dict):
-        contacts = data.get("contacts") or data.get("result")
-    elif isinstance(data, list):
-        contacts = data
-    else:
-        contacts = None
+def _send_twilio_message(chat_id: str, message: str) -> str | None:
+    """Enviar mensaje usando Twilio y retornar el SID del mensaje"""
+    try:
+        normalized_chat_id = _normalize_chat_id(chat_id)
+        # Twilio requiere formato whatsapp:+34612345678
+        formatted_number = twilio_sender._format_phone_number(normalized_chat_id)
+        success, message_sid = twilio_sender.send_message(formatted_number.replace("whatsapp:", ""), message)
+        if success:
+            return message_sid
+        return None
+    except Exception as e:
+        print(f"Error enviando mensaje Twilio: {e}")
+        return None
 
-    if contacts is None:
-        raise ValueError(f"Respuesta inesperada al solicitar contactos en Green-API: {data}")
-    return contacts
+
+def _fetch_twilio_contacts() -> list[dict]:
+    """
+    Twilio no proporciona una API para obtener contactos de WhatsApp.
+    Retornamos lista vacía ya que los contactos se gestionan desde la base de datos.
+    """
+    # Twilio no tiene API de contactos como Green-API
+    # Los contactos se gestionan desde la base de datos de clientes
+    return []
 
 
 def _ensure_whatsapp_conversation(chat_id: str, contact_name: str | None = None, created_at: datetime | None = None) -> WhatsAppConversation:
@@ -583,7 +573,7 @@ def _ejecutor_programaciones():
                         })
                         mensaje_personalizado = plantilla.contenido.format_map(contexto_mensaje)
 
-                        success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
+                        success, error_msg = twilio_sender.send_message(cliente.telefono, mensaje_personalizado)
 
                         if success:
                             try:
@@ -1370,8 +1360,8 @@ def enviar_masivo():
             # Personalizar mensaje con datos del cliente
             mensaje_personalizado = plantilla.contenido.format_map(contexto_mensaje)
             
-            # Enviar mensaje usando Green-API
-            success, error_msg = green_api_sender.send_message(cliente.telefono, mensaje_personalizado)
+            # Enviar mensaje usando Twilio
+            success, error_msg = twilio_sender.send_message(cliente.telefono, mensaje_personalizado)
             
             # Registrar envío
             mensaje_enviado = MensajeEnviado(
@@ -1794,23 +1784,21 @@ def configuracion():
         return redirect(url_for('panel'))
     
     # Verificar estado actual de Green-API
-    conectado, mensaje = green_api_sender.check_instance_status()
+    conectado, mensaje = twilio_sender.check_account_status()
     
     # Cargar datos de configuración
     try:
-        from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+        from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
         config_data = {
-            'url': GREEN_API_URL,
-            'token': GREEN_API_TOKEN,
-            'instance_id': GREEN_API_INSTANCE_ID,
-            'phone': GREEN_API_PHONE
+            'account_sid': TWILIO_ACCOUNT_SID,
+            'auth_token': TWILIO_AUTH_TOKEN,
+            'whatsapp_number': TWILIO_WHATSAPP_NUMBER
         }
     except ImportError:
         config_data = {
-            'url': 'No configurado',
-            'token': 'No configurado',
-            'instance_id': 'No configurado',
-            'phone': 'No configurado'
+            'account_sid': 'No configurado',
+            'auth_token': 'No configurado',
+            'whatsapp_number': 'No configurado'
         }
     
     # Obtener lista de usuarios
@@ -1818,63 +1806,57 @@ def configuracion():
     
     return render_template('configuracion.html', conectado=conectado, mensaje=mensaje, config=config_data, usuarios=usuarios)
 
-@app.route('/configuracion/green-api', methods=['GET', 'POST'])
+@app.route('/configuracion/twilio', methods=['GET', 'POST'])
 @login_required
-def configurar_green_api_route():
+def configurar_twilio_route():
     config_data = {
-        'url': '',
-        'token': '',
-        'instance_id': '',
-        'phone': ''
+        'account_sid': '',
+        'auth_token': '',
+        'whatsapp_number': ''
     }
 
     try:
-        if os.environ.get('RENDER'):
-            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
-        else:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
-
+        from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
         config_data = {
-            'url': GREEN_API_URL,
-            'token': GREEN_API_TOKEN,
-            'instance_id': GREEN_API_INSTANCE_ID,
-            'phone': GREEN_API_PHONE
+            'account_sid': TWILIO_ACCOUNT_SID,
+            'auth_token': TWILIO_AUTH_TOKEN,
+            'whatsapp_number': TWILIO_WHATSAPP_NUMBER
         }
     except ImportError:
         pass
 
     if request.method == 'POST':
-        api_url = request.form.get('api_url')
-        api_token = request.form.get('api_token')
-        instance_id = request.form.get('instance_id')
-        phone = request.form.get('phone')
+        account_sid = request.form.get('account_sid')
+        auth_token = request.form.get('auth_token')
+        whatsapp_number = request.form.get('whatsapp_number')
 
-        if not api_url or not api_token:
-            flash('Debe proporcionar tanto la URL como el token de Green-API', 'error')
-            return redirect(url_for('configurar_green_api_route'))
+        if not account_sid or not auth_token:
+            flash('Debe proporcionar tanto el Account SID como el Auth Token de Twilio', 'error')
+            return redirect(url_for('configurar_twilio_route'))
 
-        instance_id = instance_id or config_data.get('instance_id')
-        phone = phone or config_data.get('phone')
+        if not whatsapp_number:
+            flash('Debe proporcionar el número de WhatsApp de Twilio', 'error')
+            return redirect(url_for('configurar_twilio_route'))
 
-        if not instance_id:
-            flash('Debe proporcionar el ID de instancia de Green-API', 'error')
-            return redirect(url_for('configurar_green_api_route'))
+        # Asegurar formato whatsapp:+34612345678
+        if not whatsapp_number.startswith('whatsapp:'):
+            whatsapp_number = f'whatsapp:{whatsapp_number}'
 
-        # Configurar Green-API
-        conectado, mensaje = configurar_green_api(api_url, api_token, instance_id, phone)
+        # Configurar Twilio
+        conectado, mensaje = configurar_twilio(account_sid, auth_token, whatsapp_number)
 
         if conectado:
-            flash(f'Green-API configurado exitosamente: {mensaje}', 'success')
+            flash(f'Twilio configurado exitosamente: {mensaje}', 'success')
         else:
-            flash(f'Error configurando Green-API: {mensaje}', 'error')
+            flash(f'Error configurando Twilio: {mensaje}', 'error')
         
         return redirect(url_for('configuracion'))
     
-    return render_template('configurar_green_api.html', config=config_data)
+    return render_template('configurar_twilio.html', config=config_data)
 
 @app.route('/configuracion/test', methods=['POST'])
 @login_required
-def test_green_api():
+def test_twilio():
     numero_test = request.form.get('numero_test')
     mensaje_test = request.form.get('mensaje_test', 'Mensaje de prueba desde Recambios RM')
     
@@ -1883,7 +1865,7 @@ def test_green_api():
         return redirect(url_for('configuracion'))
     
     # Enviar mensaje de prueba
-    success, error = green_api_sender.send_message(numero_test, mensaje_test)
+    success, error = twilio_sender.send_message(numero_test, mensaje_test)
     
     if success:
         flash(f'Mensaje de prueba enviado exitosamente a {numero_test}', 'success')
@@ -2036,10 +2018,10 @@ def eliminar_usuario(usuario_id):
     
     return redirect(url_for('gestion_usuarios'))
 
-@app.route('/diagnostico-green-api')
+@app.route('/diagnostico-twilio')
 @login_required
-def diagnostico_green_api():
-    """Ruta de diagnóstico para verificar el estado de Green-API"""
+def diagnostico_twilio():
+    """Ruta de diagnóstico para verificar el estado de Twilio"""
     diagnostico = {
         'entorno': 'Producción' if os.environ.get('RENDER') else 'Desarrollo',
         'configuracion': {},
@@ -2049,24 +2031,19 @@ def diagnostico_green_api():
     
     try:
         # Verificar configuración
-        if os.environ.get('RENDER'):
-            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
-        else:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+        from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
         
         diagnostico['configuracion'] = {
-            'url': GREEN_API_URL,
-            'token': GREEN_API_TOKEN[:10] + '...' if GREEN_API_TOKEN else 'No configurado',
-            'instance_id': GREEN_API_INSTANCE_ID,
-            'phone': GREEN_API_PHONE
+            'account_sid': TWILIO_ACCOUNT_SID[:10] + '...' if TWILIO_ACCOUNT_SID else 'No configurado',
+            'auth_token': TWILIO_AUTH_TOKEN[:10] + '...' if TWILIO_AUTH_TOKEN else 'No configurado',
+            'whatsapp_number': TWILIO_WHATSAPP_NUMBER or 'No configurado'
         }
         
         # Probar conexión
-        conectado, mensaje = configurar_green_api(
-            GREEN_API_URL,
-            GREEN_API_TOKEN,
-            GREEN_API_INSTANCE_ID,
-            GREEN_API_PHONE,
+        conectado, mensaje = configurar_twilio(
+            TWILIO_ACCOUNT_SID,
+            TWILIO_AUTH_TOKEN,
+            TWILIO_WHATSAPP_NUMBER,
         )
         
         diagnostico['conexion'] = {
@@ -2083,7 +2060,7 @@ def diagnostico_green_api():
         diagnostico['estado'] = f'❌ Error de configuración: {str(e)}'
         diagnostico['error'] = str(e)
     
-    return render_template('diagnostico_green_api.html', diagnostico=diagnostico)
+    return render_template('diagnostico_twilio.html', diagnostico=diagnostico)
 
 @app.route('/setup')
 def setup():
@@ -2193,7 +2170,7 @@ def eliminar_plantillas_temporales():
 # Rutas para mensajes recibidos
 @app.route('/webhook/whatsapp', methods=['POST'])
 def webhook_whatsapp():
-    """Webhook para recibir mensajes de Green-API"""
+    """Webhook para recibir mensajes de Twilio"""
     # Rate limiting: Protección contra spam
     client_ip = _get_client_ip()
     if not _check_rate_limit(client_ip):
@@ -2204,161 +2181,120 @@ def webhook_whatsapp():
         }), 429  # HTTP 429: Too Many Requests
     
     try:
-        data = request.get_json(silent=True) or {}
+        # Twilio envía datos como form-urlencoded o JSON
+        # Intentar obtener datos de ambos formatos
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+        else:
+            # Twilio normalmente envía como form-urlencoded
+            data = request.form.to_dict()
         
         if not data:
             return jsonify({'status': 'error', 'message': 'No data received'}), 400
         
         # Log del payload completo para debugging
-        print(f"🔍 Webhook recibido - keys: {list(data.keys())}")
-        if 'body' in data:
-            print(f"🔍 Body keys: {list(data.get('body', {}).keys())}")
+        print(f"🔍 Webhook Twilio recibido - keys: {list(data.keys())}")
         
-        # Procesar mensaje recibido (admite payloads antiguos y nuevos)
-        mensaje_data = data.get('body') or data
+        # Twilio envía mensajes con estos campos:
+        # - From: whatsapp:+34612345678
+        # - To: whatsapp:+34612345678 (nuestro número)
+        # - Body: texto del mensaje
+        # - MessageSid: ID único del mensaje
+        # - NumMedia: número de archivos adjuntos (0 si no hay)
+        # - MediaUrl0, MediaUrl1, etc.: URLs de los medios
         
-        if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
-            print(f"📥 Mensaje entrante detectado")
-            # Extraer información del mensaje
-            message_data = mensaje_data.get('messageData', {})
-            sender_data = mensaje_data.get('senderData', {})
+        from_number = data.get('From', '')
+        to_number = data.get('To', '')
+        message_body = data.get('Body', '')
+        message_sid = data.get('MessageSid', '')
+        num_media = int(data.get('NumMedia', 0) or 0)
+        
+        # Extraer número de teléfono (quitar prefijo whatsapp:)
+        if from_number.startswith('whatsapp:'):
+            telefono_remitente = from_number.replace('whatsapp:', '').replace('+', '')
+        else:
+            telefono_remitente = from_number.replace('+', '')
+        
+        if not telefono_remitente:
+            return jsonify({'status': 'error', 'message': 'No sender number'}), 400
+        
+        # Determinar tipo de mensaje y media
+        mensaje_texto = message_body or ''
+        tipo_mensaje = 'texto'
+        archivo_url = None
+        
+        if num_media > 0:
+            # Hay archivos adjuntos
+            media_url = data.get('MediaUrl0', '')
+            media_content_type = data.get('MediaContentType0', '')
             
-            # Obtener número de teléfono del remitente
-            telefono_remitente = sender_data.get('sender', '').replace('@c.us', '')
-            
-            # Obtener el mensaje
-            mensaje_texto = ''
-            tipo_mensaje = 'texto'
-            archivo_url = None
-            
-            print(f"🔍 message_data keys: {list(message_data.keys())}")
-            type_message = message_data.get('typeMessage', '').lower()  # Convertir a minúsculas para comparación
-            print(f"🔍 typeMessage: '{message_data.get('typeMessage', '')}' (normalizado: '{type_message}')")
-            
-            if 'textMessageData' in message_data:
-                mensaje_texto = message_data['textMessageData'].get('textMessage', '')
-                tipo_mensaje = 'texto'
-            elif 'extendedTextMessageData' in message_data:
-                mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
-                tipo_mensaje = 'texto'
-            elif 'imageMessageData' in message_data:
-                mensaje_texto = message_data['imageMessageData'].get('caption', '') or ''
-                tipo_mensaje = 'imagen'
-                # Intentar obtener downloadUrl
-                archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
-                # Obtener idMessage desde diferentes ubicaciones posibles
-                id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
-                print(f"📷 Imagen recibida (imageMessageData) - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
-                # Si no hay caption, usar texto vacío (la imagen se mostrará por media_type)
-                if not mensaje_texto:
-                    mensaje_texto = '[Imagen]'
-                # Si no hay downloadUrl, el external_id se usará para descargar después
-            elif 'fileMessageData' in message_data:
-                # Green-API puede enviar diferentes tipos de media como fileMessageData
-                file_data = message_data.get('fileMessageData', {})
-                # Verificar el tipo de mensaje según typeMessage
-                if type_message == 'image':
-                    mensaje_texto = file_data.get('caption', '') or ''
+            if media_url:
+                archivo_url = media_url
+                
+                # Determinar tipo según content-type
+                if 'image' in media_content_type.lower():
                     tipo_mensaje = 'imagen'
-                    print(f"📷 Imagen recibida (fileMessageData) - typeMessage: 'image'")
                     if not mensaje_texto:
                         mensaje_texto = '[Imagen]'
-                elif type_message == 'video':
-                    mensaje_texto = file_data.get('caption', '') or ''
+                elif 'video' in media_content_type.lower():
                     tipo_mensaje = 'video'
-                    print(f"🎥 Video recibido (fileMessageData) - typeMessage: 'video'")
                     if not mensaje_texto:
                         mensaje_texto = '[Video]'
-                elif type_message == 'audio' or type_message == 'ptt':  # ptt = push-to-talk (nota de voz)
-                    mensaje_texto = ''
+                elif 'audio' in media_content_type.lower():
                     tipo_mensaje = 'audio'
-                    print(f"🎵 Audio recibido (fileMessageData) - typeMessage: '{type_message}'")
-                    mensaje_texto = '[Audio]'
+                    if not mensaje_texto:
+                        mensaje_texto = '[Audio]'
                 else:
-                    mensaje_texto = file_data.get('caption', '') or ''
-                    tipo_mensaje = 'documento'  # Por defecto, tratar como documento
-                    print(f"📎 Archivo recibido (fileMessageData) - typeMessage: '{type_message}'")
+                    tipo_mensaje = 'documento'
                     if not mensaje_texto:
                         mensaje_texto = '[Archivo]'
                 
-                # Intentar obtener downloadUrl
-                archivo_url = file_data.get('downloadUrl', '')
-                # Obtener idMessage desde diferentes ubicaciones posibles
-                id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
-                print(f"📎 fileMessageData - downloadUrl: {archivo_url[:50] if archivo_url else 'No disponible'}, idMessage: {id_message}, caption: '{mensaje_texto}'")
-            elif 'documentMessageData' in message_data:
-                mensaje_texto = message_data['documentMessageData'].get('caption', '')
-                tipo_mensaje = 'documento'
-                archivo_url = message_data['documentMessageData'].get('downloadUrl', '')
-            elif 'audioMessageData' in message_data:
-                mensaje_texto = '[Audio]'
-                tipo_mensaje = 'audio'
-                archivo_url = message_data['audioMessageData'].get('downloadUrl', '')
-            elif 'videoMessageData' in message_data:
-                mensaje_texto = message_data['videoMessageData'].get('caption', '') or ''
-                tipo_mensaje = 'video'
-                archivo_url = message_data['videoMessageData'].get('downloadUrl', '')
-                if not mensaje_texto:
-                    mensaje_texto = '[Video]'
+        if mensaje_texto or num_media > 0:
+            print(f"📥 Mensaje entrante de Twilio detectado")
             
             # Buscar si el remitente es un cliente existente
             cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
             
-            # Obtener chat_id_full antes de usarlo
-            chat_id_full = sender_data.get('chatId') or sender_data.get('sender')
-            if not chat_id_full and telefono_remitente:
-                try:
-                    chat_id_full = _normalize_chat_id(telefono_remitente)
-                except ValueError:
-                    chat_id_full = ''
+            # Normalizar chat_id para conversaciones
+            try:
+                chat_id_full = _normalize_chat_id(telefono_remitente)
+            except ValueError:
+                chat_id_full = telefono_remitente
             
-            # Crear registro del mensaje recibido
-            chat_display_name = sender_data.get('chatName') or sender_data.get('senderName') or chat_id_full or telefono_remitente
+            # Obtener nombre del contacto (si está disponible en Twilio)
+            # Twilio puede enviar ProfileName en algunos casos
+            contact_name = data.get('ProfileName', '') or telefono_remitente
 
+            # Crear registro del mensaje recibido
             mensaje_recibido = MensajeRecibido(
                 telefono_remitente=telefono_remitente,
-                nombre_remitente=sender_data.get('senderName', ''),
+                nombre_remitente=contact_name,
                 mensaje=mensaje_texto,
                 tipo_mensaje=tipo_mensaje,
                 archivo_url=archivo_url,
                 cliente_id=cliente_existente.id if cliente_existente else None,
-                id_mensaje_whatsapp=mensaje_data.get('idMessage', '')
+                id_mensaje_whatsapp=message_sid
             )
             
             db.session.add(mensaje_recibido)
 
             # Registrar en conversaciones avanzadas
-
             if chat_id_full:
-                timestamp = mensaje_data.get('timestamp') or message_data.get('timestamp') or data.get('timestamp')
-                if timestamp:
-                    try:
-                        sent_at = datetime.utcfromtimestamp(timestamp)
-                    except Exception:
-                        sent_at = datetime.utcnow()
-                else:
-                    sent_at = datetime.now(timezone.utc)
+                # Twilio no envía timestamp en el webhook, usar hora actual
+                sent_at = datetime.now(timezone.utc)
+                
                 try:
-                    # Obtener idMessage desde diferentes ubicaciones posibles (puede estar en mensaje_data o data)
-                    id_message = mensaje_data.get('idMessage') or data.get('idMessage') or ''
-                    # Si es una imagen y no tenemos idMessage, intentar obtenerlo del imageMessageData o fileMessageData
-                    if tipo_mensaje == 'imagen' and not id_message:
-                        image_data = message_data.get('imageMessageData') or message_data.get('fileMessageData', {})
-                        id_message = image_data.get('idMessage') or ''
-                    
-                    print(f"🔍 Antes de registrar - tipo_mensaje: {tipo_mensaje}, id_message: {id_message}, archivo_url: {archivo_url[:50] if archivo_url else 'N/A'}")
-                    
                     _register_incoming_whatsapp_message(
                         chat_id_full,
                         mensaje_texto,
-                        contact_name=chat_display_name,
+                        contact_name=contact_name,
                         sent_at=sent_at,
-                        external_id=id_message if id_message else None,
+                        external_id=message_sid if message_sid else None,
                         media_type=tipo_mensaje if tipo_mensaje != 'texto' else None,
                         media_url=archivo_url if archivo_url else None,
                     )
                     if tipo_mensaje != 'texto':
-                        print(f"📎 Media registrado - tipo: {tipo_mensaje}, external_id: {id_message or 'N/A'}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
+                        print(f"📎 Media registrado - tipo: {tipo_mensaje}, SID: {message_sid or 'N/A'}, media_url: {archivo_url[:50] if archivo_url else 'N/A'}...")
                     else:
                         print(f"✅ Mensaje de texto registrado correctamente")
                 except Exception as exc:  # noqa: BLE001
@@ -2373,9 +2309,13 @@ def webhook_whatsapp():
             archivo_info = f" - URL: {archivo_url[:50]}..." if archivo_url else ""
             print(f"✅ Mensaje recibido de {telefono_remitente}{tipo_info}: {mensaje_texto[:50]}...{archivo_info}")
             
-            return jsonify({'status': 'success', 'message': 'Message processed'}), 200
+            # Twilio espera una respuesta en formato TwiML o 200 OK
+            # Responder con 200 OK es suficiente
+            return Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
+                          mimetype='text/xml', status=200)
         
-        return jsonify({'status': 'ignored', 'message': 'Not an incoming message'}), 200
+        return Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
+                      mimetype='text/xml', status=200)
         
     except Exception as e:
         print(f"❌ Error procesando webhook: {e}")
@@ -2416,8 +2356,8 @@ def responder_mensaje(mensaje_id):
         return redirect(url_for('mensajes_recibidos'))
     
     try:
-        # Enviar respuesta usando Green-API
-        success, error_msg = green_api_sender.send_message(mensaje.telefono_remitente, respuesta_texto)
+        # Enviar respuesta usando Twilio
+        success, error_msg = twilio_sender.send_message(mensaje.telefono_remitente, respuesta_texto)
         
         # Crear registro de la respuesta
         respuesta = RespuestaMensaje(
@@ -2563,7 +2503,7 @@ def whatsapp_new_conversation():
 
         if initial_message:
             try:
-                external_id = _send_green_api_message(chat_id, initial_message)
+                external_id = _send_twilio_message(chat_id, initial_message)
             except Exception as exc:  # noqa: BLE001
                 db.session.rollback()
                 flash(f'No fue posible enviar el mensaje inicial: {exc}', 'error')
@@ -2598,7 +2538,7 @@ def whatsapp_conversation_detail(conversation_id):
             return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
 
         try:
-            external_id = _send_green_api_message(conversation.contact_number, message_text)
+            external_id = _send_twilio_message(conversation.contact_number, message_text)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             flash(f'Error enviando mensaje: {exc}', 'error')
@@ -2790,7 +2730,7 @@ def whatsapp_api_conversation_messages(conversation_id):
 @app.get('/whatsapp/api/contactos')
 def whatsapp_api_contacts():
     try:
-        contacts = _fetch_green_api_contacts()
+        contacts = _fetch_twilio_contacts()
     except Exception as exc:  # noqa: BLE001
         return jsonify({'error': f'No fue posible obtener los contactos: {exc}'}), 502
 
@@ -2874,129 +2814,24 @@ def whatsapp_media(message_id: int):
     except requests.exceptions.RequestException:
         pass
 
-    # Si no se pudo obtener desde media_url, intentar descargar usando external_id
-    try:
-        api_url, api_token, instance_id = _green_api_credentials()
-    except Exception:
+    # Con Twilio, los medios vienen como URLs directas en media_url
+    # Si no hay media_url pero hay external_id (MessageSid), intentar obtener desde Twilio
+    if not media_url and message.external_id:
+        # Twilio almacena los medios en URLs temporales
+        # Si tenemos el SID, podríamos obtener la URL, pero es más complejo
+        # Por ahora, si no hay media_url, no podemos descargar
         abort(404)
 
-    # Usar external_id o extraer de media_url si es un marcador
-    id_message = message.external_id
-    if not id_message and media_url and media_url.startswith('id:'):
-        id_message = media_url.replace('id:', '')
-
-    if not id_message:
+    # Si llegamos aquí y no hay media_url válida, no podemos servir el archivo
+    if not media_url or media_url.startswith('id:'):
         abort(404)
 
-    try:
-        download_endpoint = f"{api_url}/waInstance{instance_id}/downloadFile/{api_token}"
-        resp = requests.get(download_endpoint, params={'idMessage': id_message}, timeout=30)
-        resp.raise_for_status()
-        payload = resp.json()
-        file_data_base64 = payload.get('fileData')
-        if not file_data_base64:
-            abort(404)
-        data = base64.b64decode(file_data_base64)
-        mime_type = payload.get('mimeType', 'application/octet-stream')
-        return Response(data, mimetype=mime_type)
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error descargando media: {e}")
-        abort(404)
-
-# Ruta para polling de mensajes (respaldo al webhook)
-# Ruta para polling de mensajes (respaldo al webhook)
+# Nota: Twilio no requiere polling, usa webhooks directamente
+# Esta ruta se mantiene por compatibilidad pero no se usa con Twilio
 @app.route('/polling-mensajes')
 def polling_mensajes():
-    """Obtener mensajes usando polling como respaldo al webhook"""
-    try:
-        import requests
-        
-        # Configuración de Green-API
-        if os.environ.get('RENDER'):
-            from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID
-        else:
-            from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID
-        
-        # URL para obtener mensajes
-        url = f"{GREEN_API_URL}/waInstance{GREEN_API_INSTANCE_ID}/receiveNotification/{GREEN_API_TOKEN}"
-        
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data and 'body' in data:
-                mensaje_data = data['body']
-                
-                if mensaje_data.get('typeWebhook') == 'incomingMessageReceived':
-                    # Procesar el mensaje igual que en el webhook
-                    message_data = mensaje_data.get('messageData', {})
-                    sender_data = mensaje_data.get('senderData', {})
-                    
-                    # Obtener número de teléfono del remitente
-                    telefono_remitente = sender_data.get('sender', '').replace('@c.us', '')
-                    
-                    # Obtener el mensaje
-                    mensaje_texto = ''
-                    tipo_mensaje = 'texto'
-                    archivo_url = None
-                    
-                    if 'textMessageData' in message_data:
-                        mensaje_texto = message_data['textMessageData'].get('textMessage', '')
-                        tipo_mensaje = 'texto'
-                    elif 'extendedTextMessageData' in message_data:
-                        mensaje_texto = message_data['extendedTextMessageData'].get('text', '')
-                        tipo_mensaje = 'texto'
-                    elif 'imageMessageData' in message_data:
-                        mensaje_texto = message_data['imageMessageData'].get('caption', '')
-                        tipo_mensaje = 'imagen'
-                        archivo_url = message_data['imageMessageData'].get('downloadUrl', '')
-                    elif 'documentMessageData' in message_data:
-                        mensaje_texto = message_data['documentMessageData'].get('caption', '')
-                        tipo_mensaje = 'documento'
-                        archivo_url = message_data['documentMessageData'].get('downloadUrl', '')
-                    elif 'audioMessageData' in message_data:
-                        mensaje_texto = '[Mensaje de audio]'
-                        tipo_mensaje = 'audio'
-                        archivo_url = message_data['audioMessageData'].get('downloadUrl', '')
-                    elif 'videoMessageData' in message_data:
-                        mensaje_texto = message_data['videoMessageData'].get('caption', '')
-                        tipo_mensaje = 'video'
-                        archivo_url = message_data['videoMessageData'].get('downloadUrl', '')
-                    
-                    # Buscar si el remitente es un cliente existente
-                    cliente_existente = Cliente.query.filter_by(telefono=telefono_remitente).first()
-                    
-                    # Crear registro del mensaje recibido
-                    mensaje_recibido = MensajeRecibido(
-                        telefono_remitente=telefono_remitente,
-                        nombre_remitente=sender_data.get('senderName', ''),
-                        mensaje=mensaje_texto,
-                        tipo_mensaje=tipo_mensaje,
-                        archivo_url=archivo_url,
-                        cliente_id=cliente_existente.id if cliente_existente else None,
-                        id_mensaje_whatsapp=mensaje_data.get('idMessage', '')
-                    )
-                    
-                    db.session.add(mensaje_recibido)
-                    db.session.commit()
-                    
-                    print(f"✅ Mensaje recibido por polling de {telefono_remitente}: {mensaje_texto[:50]}...")
-                    
-                    return jsonify({'status': 'success', 'message': 'Message processed via polling'})
-                else:
-                    return jsonify({'status': 'ignored', 'message': f'Not an incoming message: {mensaje_data.get("typeWebhook")}'})
-            else:
-                return jsonify({'status': 'no_messages', 'message': 'No messages in queue'})
-                
-        elif response.status_code == 404:
-            return jsonify({'status': 'no_messages', 'message': 'No messages in queue'})
-        else:
-            return jsonify({'status': 'error', 'message': f'HTTP {response.status_code}'})
-            
-    except Exception as e:
-        print(f"❌ Error en polling: {e}")
-        return jsonify({'status': 'error', 'message': str(e)})
+    """Ruta de polling - No se usa con Twilio (usa webhooks directamente)"""
+    return jsonify({'status': 'not_used', 'message': 'Twilio usa webhooks, no polling'}), 200
 
 # Ruta para activar polling automático
 @app.route('/activar-polling')
@@ -3009,26 +2844,22 @@ if __name__ == '__main__':
         # Inicializar sistema automáticamente
         inicializar_sistema()
         
-        # Configurar Green-API automáticamente al iniciar
+        # Configurar Twilio automáticamente al iniciar
         try:
-            if os.environ.get('RENDER'):
-                from config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
-            else:
-                from green_api_config import GREEN_API_URL, GREEN_API_TOKEN, GREEN_API_INSTANCE_ID, GREEN_API_PHONE
+            from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
             
-            if GREEN_API_TOKEN != 'TU_TOKEN_AQUI':
-                conectado, mensaje = configurar_green_api(
-                    GREEN_API_URL,
-                    GREEN_API_TOKEN,
-                    GREEN_API_INSTANCE_ID,
-                    GREEN_API_PHONE,
+            if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_NUMBER:
+                conectado, mensaje = configurar_twilio(
+                    TWILIO_ACCOUNT_SID,
+                    TWILIO_AUTH_TOKEN,
+                    TWILIO_WHATSAPP_NUMBER,
                 )
                 if conectado:
-                    print("✅ Green-API configurado automáticamente - ENVÍOS REALES ACTIVADOS")
+                    print("✅ Twilio configurado automáticamente - ENVÍOS REALES ACTIVADOS")
                 else:
-                    print(f"⚠️ Green-API configurado pero no conectado: {mensaje}")
+                    print(f"⚠️ Twilio configurado pero no conectado: {mensaje}")
             else:
-                print("⚠️ Green-API no configurado - usando modo simulación")
+                print("⚠️ Twilio no configurado - usando modo simulación")
         except ImportError:
             print("⚠️ Archivo de configuración no encontrado - usando modo simulación")
     
