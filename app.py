@@ -604,7 +604,7 @@ def _ejecutor_programaciones():
                 print(f"❌ Error en ejecutor de programaciones: {e}")
 
             # Dormir hasta el siguiente minuto
-            _time.sleep(30)
+            _time.sleep(300)
 
 
 def _iniciar_hilo_programaciones():
