@@ -2067,9 +2067,39 @@ def diagnostico_twilio():
                 # Verificar que el número esté configurado correctamente
                 whatsapp_num = getattr(twilio_sender, 'whatsapp_number', None)
                 if whatsapp_num:
-                    diagnostico['numero_verificado'] = f"✅ Número configurado: {whatsapp_num}"
+                    diagnostico['numero_configurado'] = f"✅ Número configurado: {whatsapp_num}"
+                    
+                    # Verificar el número con Twilio
+                    es_valido, mensaje_verificacion, numeros_disponibles = twilio_sender.verify_whatsapp_number()
+                    diagnostico['numero_verificado'] = {
+                        'es_valido': es_valido,
+                        'mensaje': mensaje_verificacion
+                    }
+                    
+                    # Si el formato es correcto pero sigue dando error 63007, dar instrucciones
+                    if es_valido:
+                        numero_actual = whatsapp_num
+                        diagnostico['instrucciones'] = [
+                            f"✅ El formato del número es correcto: {numero_actual}",
+                            "⚠️ Si recibes error 63007, significa que este número NO está configurado en tu cuenta de Twilio",
+                            "",
+                            "🔍 SOLUCIÓN RÁPIDA - Usar Sandbox:",
+                            "   1. Ve a: https://console.twilio.com/us1/develop/sms/whatsapp/learn",
+                            "   2. Únete al Sandbox enviando el código a tu WhatsApp",
+                            "   3. Cambia TWILIO_WHATSAPP_NUMBER a: whatsapp:+14155238886",
+                            "   4. Solo podrás enviar a números verificados en el Sandbox",
+                            "",
+                            "🔍 SOLUCIÓN PRODUCCIÓN - Aprobar tu número:",
+                            "   1. Ve a: https://console.twilio.com",
+                            "   2. Solicita aprobación de WhatsApp Business para tu número",
+                            "   3. El proceso puede tardar 3-7 días",
+                            "   4. Ver: REQUISITOS_APROBACION_TWILIO.md para más detalles",
+                            "",
+                            f"📋 Número actual configurado: {numero_actual}",
+                            "   Este número debe existir y estar aprobado en tu cuenta de Twilio"
+                        ]
                 else:
-                    diagnostico['numero_verificado'] = "❌ Número no configurado en twilio_sender"
+                    diagnostico['numero_configurado'] = "❌ Número no configurado en twilio_sender"
             except Exception as e:
                 diagnostico['numero_verificado'] = f"⚠️ No se pudo verificar el número: {str(e)}"
         

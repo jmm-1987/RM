@@ -157,7 +157,14 @@ class TwilioSender:
             # Formatear número de teléfono para Twilio (formato: whatsapp:+34612345678)
             formatted_number = self._format_phone_number(phone_number)
 
-            logger.info(f"Enviando mensaje desde {self.whatsapp_number} a {formatted_number}")
+            # Log detallado para debugging
+            logger.info(f"📤 Intentando enviar mensaje:")
+            logger.info(f"   From (remitente): {self.whatsapp_number}")
+            logger.info(f"   To (destino): {formatted_number}")
+            logger.info(f"   Account SID: {self.account_sid[:10]}...")
+            
+            if not self.whatsapp_number or self.whatsapp_number == 'whatsapp:+34619639616':
+                logger.warning(f"⚠️ El número From puede no estar configurado en Twilio. Verifica en el panel de Twilio.")
 
             # Enviar mensaje usando Twilio
             message_obj = self._client.messages.create(
@@ -263,6 +270,49 @@ class TwilioSender:
             return False, f"Error verificando cuenta: {e.msg}"
         except Exception as e:
             return False, f"Error de conexión: {str(e)}"
+    
+    def verify_whatsapp_number(self) -> Tuple[bool, str, list]:
+        """
+        Verificar si el número de WhatsApp está configurado correctamente en Twilio
+        Retorna: (es_valido, mensaje, numeros_disponibles)
+        """
+        if self.simulate_mode:
+            return False, "Modo simulación activo", []
+        
+        if not self._client:
+            return False, "Cliente Twilio no inicializado", []
+        
+        if not self.whatsapp_number:
+            return False, "Número de WhatsApp no configurado", []
+        
+        try:
+            # Intentar obtener números de WhatsApp disponibles
+            # Nota: Twilio no tiene una API directa para listar números de WhatsApp
+            # Pero podemos verificar intentando obtener información del número
+            
+            # Extraer el número sin el prefijo "whatsapp:"
+            numero_sin_prefijo = self.whatsapp_number.replace('whatsapp:', '')
+            
+            # Intentar obtener información de la cuenta para verificar conexión
+            account = self._client.api.accounts(self.account_sid).fetch()
+            
+            # Verificar formato
+            if not self.whatsapp_number.startswith('whatsapp:'):
+                return False, f"Formato incorrecto. Debe empezar con 'whatsapp:'. Actual: {self.whatsapp_number}", []
+            
+            if not numero_sin_prefijo.startswith('+'):
+                return False, f"Formato incorrecto. Debe tener código de país con '+'. Actual: {self.whatsapp_number}", []
+            
+            # Si llegamos aquí, el formato es correcto
+            # El error 63007 se produce cuando intentas enviar, no cuando verificas
+            mensaje = f"Formato correcto: {self.whatsapp_number}. Verifica en el panel de Twilio que este número esté configurado."
+            
+            return True, mensaje, []
+            
+        except TwilioRestException as e:
+            return False, f"Error verificando número: {e.msg}", []
+        except Exception as e:
+            return False, f"Error de conexión: {str(e)}", []
 
     def send_bulk_messages(self, messages: List[Dict]) -> List[Dict]:
         """

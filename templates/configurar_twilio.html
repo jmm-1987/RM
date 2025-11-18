@@ -35,8 +35,12 @@
                     <div class="mb-3">
                         <label for="whatsapp_number" class="form-label">Número de WhatsApp:</label>
                         <input type="text" class="form-control" id="whatsapp_number" name="whatsapp_number" 
-                               placeholder="whatsapp:+34612345678" value="{{ config.whatsapp_number }}" required>
-                        <div class="form-text">Número de WhatsApp Business (formato: whatsapp:+34612345678). Para pruebas usa el número del Sandbox.</div>
+                               placeholder="whatsapp:+14155238886" value="{{ config.whatsapp_number }}" required>
+                        <div class="form-text">
+                            <strong>Para pruebas (Sandbox):</strong> <code>whatsapp:+14155238886</code><br>
+                            <strong>Para producción:</strong> <code>whatsapp:+34612345678</code> (debe estar aprobado en Twilio)<br>
+                            <small class="text-muted">⚠️ Si recibes error 63007, usa el número del Sandbox. Ver <a href="https://console.twilio.com/us1/develop/sms/whatsapp/learn" target="_blank">guía del Sandbox</a></small>
+                        </div>
                     </div>
                     
                     <div class="alert alert-info">
@@ -73,8 +77,14 @@
                 </ul>
                 
                 <h6>3. Obtén tu número de WhatsApp</h6>
-                <p class="small">Para pruebas: Ve a <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank">WhatsApp Sandbox</a> y únete al Sandbox. El número será algo como <code>whatsapp:+14155238886</code></p>
-                <p class="small">Para producción: Solicita un número de WhatsApp Business en el panel de Twilio.</p>
+                <div class="alert alert-success small mb-2">
+                    <strong>🚀 Opción Rápida (Sandbox):</strong><br>
+                    1. Ve a <a href="https://console.twilio.com/us1/develop/sms/whatsapp/learn" target="_blank">WhatsApp Sandbox</a><br>
+                    2. Únete al Sandbox enviando el código por WhatsApp<br>
+                    3. Usa: <code>whatsapp:+14155238886</code><br>
+                    <small>✅ Funciona inmediatamente, sin aprobación</small>
+                </div>
+                <p class="small">Para producción: Solicita un número de WhatsApp Business en el panel de Twilio (puede tardar días en aprobarse).</p>
                 
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle"></i>
