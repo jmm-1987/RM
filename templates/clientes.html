@@ -2,6 +2,9 @@
 
 {% block title %}Clientes{% endblock %}
 
+{% block extra_head %}
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -25,7 +28,7 @@
                 <form method="GET">
                     <div class="mb-3">
                         <label for="zona_id" class="form-label">Seleccionar Zona:</label>
-                        <select name="zona_id" id="zona_id" class="form-select" onchange="this.form.submit()">
+                        <select name="zona_id" id="zona_id" class="form-select" style="color: #ffffff !important;" onchange="this.form.submit()">
                             <option value="">Todas las zonas</option>
                             {% for zona in zonas %}
                             <option value="{{ zona.id }}" {% if zona.id == zona_seleccionada %}selected{% endif %}>
@@ -83,7 +86,7 @@
                     <form method="GET" class="row g-2 align-items-center">
                         <input type="hidden" name="zona_id" value="{{ zona_seleccionada or '' }}">
                         <div class="col-sm-2">
-                            <select name="filtro_estado" id="filtro_estado" class="form-select" onchange="this.form.submit()">
+                            <select name="filtro_estado" id="filtro_estado" class="form-select" style="color: #ffffff !important;" onchange="this.form.submit()">
                                 <option value="activos" {% if filtro_estado == 'activos' %}selected{% endif %}>Solo activos</option>
                                 <option value="todos" {% if filtro_estado == 'todos' %}selected{% endif %}>Todos</option>
                                 <option value="inactivos" {% if filtro_estado == 'inactivos' %}selected{% endif %}>Solo inactivos</option>
@@ -105,35 +108,25 @@
             <div class="card-body">
                 {% if clientes %}
                     <div class="table-responsive">
-                        <table class="table table-striped align-middle">
+                        <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th style="width: 110px;">Código</th>
                                     <th>Nombre</th>
+                                    <th>Estado</th>
                                     <th>Teléfono</th>
                                     <th>Dirección</th>
                                     <th>Población</th>
                                     <th>Zona</th>
-                                    <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for cliente in clientes %}
-                                <tr>
-                                    <td>{{ cliente.codigo or '—' }}</td>
-                                    <td>{{ cliente.nombre }}</td>
-                                    <td>
-                                        <a href="https://wa.me/{{ cliente.telefono }}" target="_blank" class="btn btn-sm btn-whatsapp">
-                                            <i class="fab fa-whatsapp"></i> {{ cliente.telefono }}
-                                        </a>
-                                    </td>
-                                    <td>{{ cliente.direccion or 'No especificada' }}</td>
-                                    <td>{{ cliente.poblacion or 'No especificada' }}</td>
-                                    <td>
-                                        <span class="badge bg-primary">{{ cliente.zona.nombre }}</span>
-                                    </td>
-                                    <td>
+                                <tr style="color: #ffffff !important;">
+                                    <td style="color: #ffffff !important;">{{ cliente.codigo or '—' }}</td>
+                                    <td style="color: #ffffff !important;">{{ cliente.nombre }}</td>
+                                    <td style="color: #ffffff !important;">
                                         <form method="POST" action="{{ url_for('toggle_cliente', cliente_id=cliente.id) }}" class="d-inline">
                                             <input type="hidden" name="field" value="activo">
                                             <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -142,7 +135,17 @@
                                             </button>
                                         </form>
                                     </td>
-                                    <td>
+                                    <td style="color: #ffffff !important;">
+                                        <a href="https://wa.me/{{ cliente.telefono }}" target="_blank" class="btn btn-sm btn-whatsapp">
+                                            <i class="fab fa-whatsapp"></i> {{ cliente.telefono }}
+                                        </a>
+                                    </td>
+                                    <td style="color: #ffffff !important;">{{ cliente.direccion or 'No especificada' }}</td>
+                                    <td style="color: #ffffff !important;">{{ cliente.poblacion or 'No especificada' }}</td>
+                                    <td style="color: #ffffff !important;">
+                                        <span class="badge bg-primary">{{ cliente.zona.nombre }}</span>
+                                    </td>
+                                    <td style="color: #ffffff !important;">
                                         <div class="btn-group" role="group">
                                             <a href="https://wa.me/{{ cliente.telefono }}" target="_blank" class="btn btn-success btn-sm" title="Abrir WhatsApp">
                                                 <i class="fab fa-whatsapp"></i>
@@ -212,5 +215,6 @@ function confirmarEliminacion(clienteId, clienteNombre) {
     var modal = new bootstrap.Modal(document.getElementById('confirmModal'));
     modal.show();
 }
+
 </script>
 {% endblock %}

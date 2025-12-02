@@ -322,7 +322,7 @@ def _send_twilio_message(chat_id: str, message: str) -> str | None:
         return None
     except Exception as e:
         print(f"Error enviando mensaje Twilio: {e}")
-        return None
+    return None
 
 
 def _fetch_twilio_contacts() -> list[dict]:

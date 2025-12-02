@@ -108,26 +108,78 @@
             color: white;
         }
         
+        .table tbody tr,
+        .table tbody tr td {
+            color: #ffffff !important;
+            background-color: transparent !important;
+        }
+        
+        /* Eliminar efecto de rayas alternadas en todas las tablas - MÁXIMA ESPECIFICIDAD */
+        .table tbody tr:nth-of-type(odd),
+        .table tbody tr:nth-of-type(even),
+        .table tbody tr:nth-of-type(odd) td,
+        .table tbody tr:nth-of-type(even) td,
+        .table tbody tr:nth-child(odd),
+        .table tbody tr:nth-child(even),
+        .table tbody tr:nth-child(odd) td,
+        .table tbody tr:nth-child(even) td,
+        table tbody tr:nth-of-type(odd),
+        table tbody tr:nth-of-type(even),
+        table tbody tr:nth-of-type(odd) td,
+        table tbody tr:nth-of-type(even) td {
+            color: #ffffff !important;
+            background-color: transparent !important;
+            background: transparent !important;
+        }
+        
+        /* Eliminar cualquier estilo de Bootstrap table-striped */
+        .table-striped > tbody > tr:nth-of-type(odd) > td,
+        .table-striped > tbody > tr:nth-of-type(odd) > th,
+        .table-striped > tbody > tr:nth-of-type(even) > td,
+        .table-striped > tbody > tr:nth-of-type(even) > th {
+            background-color: transparent !important;
+            background: transparent !important;
+            color: #ffffff !important;
+        }
+        
         .table-dark {
             background-color: rgba(255, 255, 255, 0.05);
         }
         
-        .form-control, .form-select {
+        .form-control {
             background: rgba(255, 255, 255, 0.1) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
             color: white !important;
         }
         
         .form-select {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 16px 12px !important;
+            padding-right: 2.5rem !important;
         }
         
         .form-control::placeholder {
             color: rgba(255, 255, 255, 0.5);
         }
         
-        .form-control:focus, .form-select:focus {
+        .form-control:focus {
             background: rgba(255, 255, 255, 0.15) !important;
+            border-color: rgba(102, 126, 234, 0.5) !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+            color: white !important;
+        }
+        
+        .form-select:focus {
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 16px 12px !important;
             border-color: rgba(102, 126, 234, 0.5) !important;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
             color: white !important;
