@@ -54,43 +54,36 @@
                     </div>
                     <div class="message-content">
                         {% if message.media_type %}
-                            {% if message.media_url or message.external_id %}
-                                {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
-                                {% if message.media_type == 'imagen' %}
-                                    <div class="media-thumbnail-wrapper">
-                                        <a href="{{ media_route }}" target="_blank" rel="noopener" class="media-link" title="Haz clic para ver imagen completa">
-                                            <img src="{{ media_route }}" alt="Imagen" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                            <div style="display:none;" class="attachment-chip">
-                                                <i class="fas fa-image"></i>
-                                                <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
-                                            </div>
-                                        </a>
-                                        <small class="media-indicator" style="display: block; margin-top: 4px; opacity: 0.7;">
-                                            <i class="fas fa-image"></i> Imagen
-                                        </small>
-                                    </div>
-                                {% elif message.media_type == 'video' %}
-                                    <video controls class="media-preview video-preview">
-                                        <source src="{{ media_route }}">
-                                        Tu navegador no soporta video.
-                                    </video>
-                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar video</a></div>
-                                {% elif message.media_type == 'audio' %}
-                                    <audio controls class="audio-player">
-                                        <source src="{{ media_route }}">
-                                        Tu navegador no soporta audio.
-                                    </audio>
-                                    <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar audio</a></div>
-                                {% else %}
-                                    <div class="attachment-chip">
-                                        <i class="fas fa-paperclip"></i>
-                                        <a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar archivo</a>
-                                    </div>
-                                {% endif %}
+                            {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
+                            {% if message.media_type == 'imagen' %}
+                                <div class="media-thumbnail-wrapper">
+                                    <a href="{{ media_route }}" target="_blank" rel="noopener" class="media-link" title="Haz clic para ver imagen completa">
+                                        <img src="{{ media_route }}" alt="Imagen" class="media-preview" style="width: 400px; height: 300px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                        <div style="display:none;" class="attachment-chip">
+                                            <i class="fas fa-image"></i>
+                                            <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
+                                        </div>
+                                    </a>
+                                    <small class="media-indicator" style="display: block; margin-top: 4px; opacity: 0.7;">
+                                        <i class="fas fa-image"></i> Imagen
+                                    </small>
+                                </div>
+                            {% elif message.media_type == 'video' %}
+                                <video controls class="media-preview video-preview">
+                                    <source src="{{ media_route }}">
+                                    Tu navegador no soporta video.
+                                </video>
+                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar video</a></div>
+                            {% elif message.media_type == 'audio' %}
+                                <audio controls class="audio-player">
+                                    <source src="{{ media_route }}">
+                                    Tu navegador no soporta audio.
+                                </audio>
+                                <div><a href="{{ media_route }}" target="_blank" rel="noopener" download style="color: {% if message.sender_type == 'agent' %}#fff{% else %}#1f8a70{% endif %};">Descargar audio</a></div>
                             {% else %}
-                                {# Si hay media_type pero no hay URL ni external_id, mostrar un indicador #}
                                 <div class="attachment-chip">
-                                    <i class="fas fa-image"></i> Imagen (no disponible)
+                                    <i class="fas fa-paperclip"></i>
+                                    <a href="{{ media_route }}" target="_blank" rel="noopener" download>Descargar archivo</a>
                                 </div>
                             {% endif %}
                         {% endif %}
@@ -105,17 +98,34 @@
         {% endif %}
     </div>
     <div class="card-footer">
-        <form method="post" class="d-flex gap-2 flex-wrap" id="message-form">
-            <textarea
-                name="message"
-                class="form-control"
-                rows="2"
-                placeholder="Escribe tu respuesta..."
-                required
-                id="message-input"
-            ></textarea>
+        <form method="post" enctype="multipart/form-data" class="d-flex gap-2 flex-wrap" id="message-form">
+            <div class="flex-grow-1 d-flex flex-column gap-2">
+                <div id="image-preview-container" class="d-none mb-2">
+                    <div class="position-relative d-inline-block">
+                        <img id="image-preview" src="" alt="Vista previa" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #28a745;">
+                        <button type="button" id="remove-image-btn" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" style="border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 1;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <textarea
+                        name="message"
+                        class="form-control"
+                        rows="2"
+                        placeholder="Escribe tu respuesta..."
+                        id="message-input"
+                    ></textarea>
+                    <div class="d-flex flex-column gap-2">
+                        <label for="image-input" class="btn btn-outline-primary mb-0" style="cursor: pointer;" title="Adjuntar imagen">
+                            <i class="fas fa-image"></i>
+                        </label>
+                        <input type="file" id="image-input" name="image" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
             <div class="d-flex flex-column align-items-end gap-2">
-                <button class="btn btn-success" type="submit">Enviar</button>
+                <button class="btn btn-success" type="submit" id="send-btn">Enviar</button>
                 <div id="send-feedback" class="small text-success d-none"></div>
             </div>
         </form>
@@ -135,12 +145,12 @@
     const contactLabel = thread.dataset.contactName || "Cliente";
 
     function buildMediaContent(container, msg) {
-        // Mostrar media si hay media_type y (media_route, media_url o external_id)
-        if (msg.media_type && (msg.media_route || msg.media_url || msg.external_id)) {
+        // Mostrar media si hay media_type (siempre intentar mostrar, incluso sin URL guardada)
+        if (msg.media_type) {
             const mediaWrapper = document.createElement("div");
             mediaWrapper.className = "message-media";
-            // Preferir media_route (generado por el servidor), luego media_url, luego construir desde external_id
-            const sourceUrl = msg.media_route || msg.media_url || (msg.external_id ? `/whatsapp/media/${msg.id}` : null);
+            // Preferir media_route (generado por el servidor), luego media_url, luego construir desde external_id o message_id
+            const sourceUrl = msg.media_route || msg.media_url || (msg.external_id ? `/whatsapp/media/${msg.id}` : `/whatsapp/media/${msg.id}`);
 
             switch (msg.media_type) {
                 case "imagen":
@@ -158,6 +168,9 @@
                     img.src = sourceUrl;
                     img.alt = "Imagen";
                     img.className = "media-preview";
+                    img.style.width = "400px";
+                    img.style.height = "300px";
+                    img.style.objectFit = "contain";
                     img.onerror = function() {
                         // Si la imagen falla al cargar, mostrar un enlace de descarga
                         img.style.display = 'none';
@@ -325,6 +338,56 @@
     const form = document.getElementById("message-form");
     const textarea = document.getElementById("message-input");
     const feedback = document.getElementById("send-feedback");
+    const imageInput = document.getElementById("image-input");
+    const imagePreview = document.getElementById("image-preview");
+    const imagePreviewContainer = document.getElementById("image-preview-container");
+    const removeImageBtn = document.getElementById("remove-image-btn");
+    const sendBtn = document.getElementById("send-btn");
+
+    // Manejar selección de imagen
+    if (imageInput) {
+        imageInput.addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Validar que sea una imagen
+                if (!file.type.startsWith('image/')) {
+                    alert('Por favor, selecciona un archivo de imagen válido');
+                    imageInput.value = '';
+                    return;
+                }
+
+                // Validar tamaño (máximo 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('La imagen es demasiado grande. Máximo 5MB');
+                    imageInput.value = '';
+                    return;
+                }
+
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreviewContainer.classList.remove("d-none");
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Manejar eliminación de imagen
+    if (removeImageBtn) {
+        removeImageBtn.addEventListener("click", function() {
+            if (imageInput) {
+                imageInput.value = '';
+            }
+            if (imagePreview) {
+                imagePreview.src = '';
+            }
+            if (imagePreviewContainer) {
+                imagePreviewContainer.classList.add("d-none");
+            }
+        });
+    }
 
     if (form && textarea) {
         textarea.addEventListener("keydown", function(event) {
@@ -334,7 +397,22 @@
             }
         });
 
-        form.addEventListener("submit", function() {
+        form.addEventListener("submit", function(event) {
+            // Validar que haya mensaje o imagen
+            const hasMessage = textarea.value.trim().length > 0;
+            const hasImage = imageInput && imageInput.files.length > 0;
+
+            if (!hasMessage && !hasImage) {
+                event.preventDefault();
+                alert('Debes escribir un mensaje o adjuntar una imagen');
+                return false;
+            }
+
+            // Remover el atributo required del textarea si hay imagen
+            if (hasImage && !hasMessage) {
+                textarea.removeAttribute('required');
+            }
+
             if (feedback) {
                 feedback.classList.add("d-none");
                 feedback.classList.remove("text-danger", "text-success");

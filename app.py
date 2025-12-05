@@ -80,16 +80,12 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
 # La URL interna (sin dominio) solo funciona desde dentro de Render
 # Ejemplo URL externa: 'postgresql://usuario:password@dpg-xxxxx-a.oregon-postgres.render.com:5432/nombre_bd'
 # IMPORTANTE: Añade el dominio completo .oregon-postgres.render.com (o el que corresponda) al host
-DEFAULT_DATABASE_URL = 'postgresql://rm_aunv_user:Rh5sYRf0UnFAVSggD5OU8d6FTCRm1FIl@dpg-d4c6vu6r433s73dbo2lg-a.oregon-postgres.render.com/rm_aunv'
+# URL de base de datos única (misma para local y producción)
+# Se usa siempre la misma base de datos desde el .env o variable de entorno
+PRODUCTION_DATABASE_URL = 'postgresql://rm_aunv_user:Rh5sYRf0UnFAVSggD5OU8d6FTCRm1FIl@dpg-d4c6vu6r433s73dbo2lg-a.oregon-postgres.render.com:5432/rm_aunv'
 
-# Obtener DATABASE_URL - Primero intenta variable de entorno, luego usa la URL por defecto
-database_url = os.environ.get('DATABASE_URL') or DEFAULT_DATABASE_URL
-
-# Si es la URL por defecto sin modificar, advertir pero permitir continuar
-if database_url == DEFAULT_DATABASE_URL:
-    print("⚠️ ADVERTENCIA: Usando URL de base de datos por defecto.")
-    print("   Configura DATABASE_URL en variables de entorno o actualiza DEFAULT_DATABASE_URL en app.py")
-    print("   Para producción en Render, configura DATABASE_URL en las variables de entorno del servicio")
+# Obtener DATABASE_URL - Primero intenta variable de entorno, luego usa la URL de producción
+database_url = os.environ.get('DATABASE_URL') or PRODUCTION_DATABASE_URL
 
 # Validar que sea PostgreSQL
 if not database_url.startswith(('postgresql://', 'postgres://')):
@@ -117,8 +113,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuración del engine para PostgreSQL (siempre PostgreSQL)
-# SSL solo requerido en producción (Render), en local puede no ser necesario
-ssl_mode = 'require' if os.environ.get('RENDER') else 'prefer'
+# SSL requerido para conexiones a Render (tanto local como producción)
+ssl_mode = 'require'
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
     'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
@@ -135,10 +131,12 @@ app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 # Configuración común
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['WHATSAPP_UPLOAD_FOLDER'] = 'static/whatsapp_uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Crear directorio de uploads si no existe  
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['WHATSAPP_UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 
@@ -229,10 +227,24 @@ with app.app_context():
         
         # Nota: inicializar_sistema() se ejecutará automáticamente en before_request
         # No se llama aquí porque aún no está definida en este punto del código
-    except Exception as e:
-        print(f"❌ Error crítico inicializando base de datos: {e}")
-        import traceback
-        print(traceback.format_exc())
+    except Exception as db_error:
+        error_msg = str(db_error)
+        if "could not translate host name" in error_msg or "Name or service not known" in error_msg:
+            print("\n" + "="*70)
+            print("❌ ERROR: No se puede conectar a la base de datos remota desde local")
+            print("="*70)
+            print("\n📋 SOLUCIÓN: Configura una base de datos PostgreSQL local")
+            print("\n1. Instala PostgreSQL localmente (si no lo tienes)")
+            print("2. Crea una base de datos:")
+            print("   CREATE DATABASE recambios_rm;")
+            print("\n3. Actualiza DATABASE_URL en tu archivo .env:")
+            print("   DATABASE_URL=postgresql://postgres:tu_password@localhost:5432/recambios_rm")
+            print("\n4. Reinicia la aplicación")
+            print("\n" + "="*70 + "\n")
+        else:
+            print(f"❌ Error crítico inicializando base de datos: {db_error}")
+            import traceback
+            print(traceback.format_exc())
         # No hacer raise para que la app pueda iniciar aunque haya errores menores
         print("⚠️ Continuando con el inicio de la aplicación...")
 
@@ -474,9 +486,9 @@ def _message_to_dict(message: WhatsAppMessage) -> dict:
             "username": message.usuario.username,
             "color": message.usuario.color or "#007bff",
         }
-    # Generar media_route si hay media_type y (media_url o external_id)
+    # Generar media_route si hay media_type (siempre intentar mostrar, incluso sin URL guardada)
     media_route = None
-    if message.media_type and (message.media_url or message.external_id):
+    if message.media_type:
         media_route = url_for('whatsapp_media', message_id=message.id)
     
     return {
@@ -727,7 +739,7 @@ def inicializar_sistema():
             usuario_admin = Usuario.query.filter_by(username='jmurillo').first()
             if not usuario_admin:
                 usuario_admin = Usuario(username='jmurillo', activo=True)
-                usuario_admin.set_password('TxMb-7-0')
+                usuario_admin.set_password('123')
                 db.session.add(usuario_admin)
                 db.session.commit()
                 print("✅ Usuario administrador 'jmurillo' creado")
@@ -2672,30 +2684,105 @@ def whatsapp_conversation_detail(conversation_id):
 
     if request.method == 'POST':
         message_text = (request.form.get('message') or '').strip()
+        image_file = request.files.get('image')
 
-        if not message_text:
-            flash('El mensaje no puede estar vacío', 'error')
+        # Validar que haya al menos mensaje o imagen
+        if not message_text and not image_file:
+            flash('Debes escribir un mensaje o adjuntar una imagen', 'error')
             return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
 
         try:
-            external_id = _send_twilio_message(conversation.contact_number, message_text)
+            external_id = None
+            media_url = None
+            media_type = None
+
+            # Si hay imagen, subirla y enviarla
+            if image_file and image_file.filename:
+                # Validar que sea una imagen
+                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                file_ext = image_file.filename.rsplit('.', 1)[1].lower() if '.' in image_file.filename else ''
+                
+                if file_ext not in allowed_extensions:
+                    flash('Solo se permiten archivos de imagen (PNG, JPG, JPEG, GIF, WEBP)', 'error')
+                    return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+                # Guardar imagen temporalmente
+                filename = secure_filename(f"{conversation_id}_{datetime.now().timestamp()}_{image_file.filename}")
+                filepath = os.path.join(app.config['WHATSAPP_UPLOAD_FOLDER'], filename)
+                image_file.save(filepath)
+
+                # Generar URL pública para la imagen
+                # En producción, esto debería ser una URL pública accesible desde internet
+                base_url = (
+                    os.environ.get('PUBLIC_BASE_URL')
+                    or os.environ.get('RENDER_EXTERNAL_URL')
+                    or os.environ.get('EXTERNAL_URL')
+                    or request.url_root.rstrip('/')
+                )
+                media_url = f"{base_url}/whatsapp/uploads/{filename}"
+                media_type = 'imagen'
+
+                # Validar que la URL sea accesible públicamente
+                if 'localhost' in media_url or '127.0.0.1' in media_url:
+                    # En desarrollo local, Twilio no puede acceder a localhost
+                    # Intentar usar ngrok o similar, o mostrar advertencia
+                    print(f"⚠️ ADVERTENCIA: URL local detectada: {media_url}")
+                    print("   Twilio necesita una URL pública accesible desde internet.")
+                    print("   En desarrollo local, usa ngrok o similar para exponer tu servidor.")
+                    flash('Error: En desarrollo local, Twilio no puede acceder a imágenes en localhost. Usa ngrok o despliega en producción.', 'error')
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+                print(f"📤 Enviando imagen a Twilio:")
+                print(f"   URL: {media_url}")
+                print(f"   Número destino: {conversation.contact_number}")
+                print(f"   Caption: {message_text if message_text else '(sin texto)'}")
+
+                # Enviar imagen usando Twilio
+                success, result = twilio_sender.send_image(
+                    conversation.contact_number,
+                    media_url,
+                    caption=message_text if message_text else ""
+                )
+
+                if not success:
+                    print(f"❌ Error enviando imagen: {result}")
+                    # Eliminar archivo si falla el envío
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    flash(f'Error enviando imagen: {result}', 'error')
+                    return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
+
+                print(f"✅ Imagen enviada correctamente. SID: {result}")
+
+                external_id = result  # El SID del mensaje de Twilio
+            else:
+                # Enviar solo texto
+                external_id = _send_twilio_message(conversation.contact_number, message_text)
+
+            _append_whatsapp_message(
+                conversation,
+                sender_type='agent',
+                message_text=message_text if message_text else '[Imagen]',
+                sent_at=datetime.utcnow(),
+                external_id=external_id,
+                is_read=True,
+                media_type=media_type,
+                media_url=media_url,
+                usuario_id=current_user.id if current_user.is_authenticated else None,
+            )
+            db.session.commit()
+            flash('Mensaje enviado correctamente', 'success')
+            return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             flash(f'Error enviando mensaje: {exc}', 'error')
             return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
-
-        _append_whatsapp_message(
-            conversation,
-            sender_type='agent',
-            message_text=message_text,
-            sent_at=datetime.utcnow(),
-            external_id=external_id,
-            is_read=True,
-            usuario_id=current_user.id if current_user.is_authenticated else None,
-        )
-        db.session.commit()
-        flash('Mensaje enviado correctamente', 'success')
-        return redirect(url_for('whatsapp_conversation_detail', conversation_id=conversation.id))
 
     unread_messages = conversation.messages.filter_by(sender_type='customer', is_read=False).all()
     if unread_messages:
@@ -2899,6 +2986,11 @@ def whatsapp_api_contacts():
     return jsonify({'contacts': normalized})
 
 
+@app.route('/whatsapp/uploads/<filename>')
+def whatsapp_uploaded_file(filename):
+    """Servir imágenes subidas para WhatsApp (necesario para que Twilio pueda acceder)"""
+    return send_from_directory(app.config['WHATSAPP_UPLOAD_FOLDER'], filename)
+
 @app.route('/whatsapp/health')
 def whatsapp_health_check():
     return jsonify({'status': 'ok'}), 200
@@ -2936,7 +3028,8 @@ def whatsapp_debug_mensajes():
 def whatsapp_media(message_id: int):
     message = WhatsAppMessage.query.get_or_404(message_id)
 
-    if not message.media_url and not message.external_id:
+    # Permitir obtener medios si hay media_type, incluso sin URL guardada
+    if not message.media_type and not message.media_url and not message.external_id:
         abort(404)
 
     # Si media_url es un marcador temporal (id:xxx), extraer el id
@@ -2948,26 +3041,63 @@ def whatsapp_media(message_id: int):
         # Si no es una URL válida, intentar usar external_id
         media_url = None
 
-    try:
-        if media_url and not media_url.startswith('id:'):
-            proxied = requests.get(media_url, timeout=30)
+    # Intentar usar la URL guardada primero
+    if media_url and not media_url.startswith('id:'):
+        try:
+            # Las URLs de Twilio requieren autenticación HTTP básica
+            from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+            auth = None
+            if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and 'twilio.com' in media_url:
+                auth = (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            
+            proxied = requests.get(media_url, timeout=30, auth=auth)
             proxied.raise_for_status()
             mime_type = proxied.headers.get('Content-Type', 'application/octet-stream')
             return Response(proxied.content, mimetype=mime_type)
-    except requests.exceptions.RequestException:
-        pass
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Error obteniendo media desde URL guardada: {e}")
+            # Si falla, intentar obtener desde Twilio usando el MessageSid
+            media_url = None
 
-    # Con Twilio, los medios vienen como URLs directas en media_url
-    # Si no hay media_url pero hay external_id (MessageSid), intentar obtener desde Twilio
+    # Si no hay media_url válida pero tenemos external_id (MessageSid), obtener desde Twilio
     if not media_url and message.external_id:
-        # Twilio almacena los medios en URLs temporales
-        # Si tenemos el SID, podríamos obtener la URL, pero es más complejo
-        # Por ahora, si no hay media_url, no podemos descargar
-        abort(404)
+        try:
+            from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+            from twilio.rest import Client
+            
+            if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+                client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+                # Obtener el mensaje desde Twilio usando el MessageSid
+                twilio_message = client.messages(message.external_id).fetch()
+                
+                # Twilio devuelve los medios en una lista
+                media_list = twilio_message.media.list()
+                if media_list and len(media_list) > 0:
+                    # Obtener el primer medio
+                    media_sid = media_list[0].sid
+                    # Obtener la URL del medio (la URI viene como .json, necesitamos quitar eso)
+                    media_instance = client.messages(message.external_id).media(media_sid).fetch()
+                    # La URI viene como: /2010-04-01/Accounts/.../Messages/.../Media/...json
+                    # Necesitamos construir la URL completa
+                    base_url = f"https://api.twilio.com{media_instance.uri.replace('.json', '')}"
+                    media_url = base_url
+                    
+                    # Actualizar el mensaje con la nueva URL (para futuras peticiones)
+                    message.media_url = media_url
+                    db.session.commit()
+                    
+                    # Descargar y servir el medio con autenticación
+                    proxied = requests.get(media_url, timeout=30, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN))
+                    proxied.raise_for_status()
+                    mime_type = proxied.headers.get('Content-Type', 'application/octet-stream')
+                    return Response(proxied.content, mimetype=mime_type)
+        except Exception as e:
+            print(f"⚠️ Error obteniendo media desde Twilio: {e}")
+            import traceback
+            print(traceback.format_exc())
 
-    # Si llegamos aquí y no hay media_url válida, no podemos servir el archivo
-    if not media_url or media_url.startswith('id:'):
-        abort(404)
+    # Si llegamos aquí, no pudimos obtener el medio
+    abort(404)
 
 # Nota: Twilio no requiere polling, usa webhooks directamente
 # Esta ruta se mantiene por compatibilidad pero no se usa con Twilio

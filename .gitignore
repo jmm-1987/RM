@@ -43,6 +43,10 @@ venv.bak/
 #static/uploads/*.gif
 #static/uploads/*.webp
 
+# Archivos temporales de WhatsApp (imágenes subidas para envío)
+static/whatsapp_uploads/*
+!static/whatsapp_uploads/.gitkeep
+
 # Archivos del sistema
 .DS_Store
 Thumbs.db
@@ -59,3 +63,6 @@ Thumbs.db
 # Archivos temporales
 *.tmp
 *.temp
+
+# Variables de entorno (NO subir credenciales)
+.env

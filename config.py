@@ -1,5 +1,24 @@
 # Configuración para producción en Render
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde archivo .env (solo en desarrollo local)
+# En producción (Render), las variables se cargan desde las variables de entorno del sistema
+try:
+    load_dotenv()
+except UnicodeDecodeError:
+    # Si hay error de codificación, intentar con diferentes codificaciones
+    import codecs
+    try:
+        # Intentar con encoding por defecto de Windows
+        with codecs.open('.env', 'r', encoding='utf-8-sig') as f:
+            content = f.read()
+        with codecs.open('.env', 'w', encoding='utf-8') as f:
+            f.write(content)
+        load_dotenv()
+    except Exception as e:
+        print(f"⚠️ Advertencia: No se pudo cargar .env: {e}")
+        print("   Continuando con variables de entorno del sistema...")
 
 # URL de base de datos PostgreSQL por defecto (para desarrollo local)
 # Formato: postgresql://usuario:contraseña@host:5432/nombre_bd
