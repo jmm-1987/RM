@@ -57,13 +57,18 @@
                             {% if message.media_url or message.external_id %}
                                 {% set media_route = url_for('whatsapp_media', message_id=message.id) %}
                                 {% if message.media_type == 'imagen' %}
-                                    <a href="{{ media_route }}" target="_blank" rel="noopener" download class="media-link">
-                                        <img src="{{ media_route }}" alt="Imagen recibida" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                        <div style="display:none;" class="attachment-chip">
-                                            <i class="fas fa-image"></i>
-                                            <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
-                                        </div>
-                                    </a>
+                                    <div class="media-thumbnail-wrapper">
+                                        <a href="{{ media_route }}" target="_blank" rel="noopener" class="media-link" title="Haz clic para ver imagen completa">
+                                            <img src="{{ media_route }}" alt="Imagen" class="media-preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                            <div style="display:none;" class="attachment-chip">
+                                                <i class="fas fa-image"></i>
+                                                <a href="{{ media_route }}" target="_blank" rel="noopener" download>Ver/Descargar imagen</a>
+                                            </div>
+                                        </a>
+                                        <small class="media-indicator" style="display: block; margin-top: 4px; opacity: 0.7;">
+                                            <i class="fas fa-image"></i> Imagen
+                                        </small>
+                                    </div>
                                 {% elif message.media_type == 'video' %}
                                     <video controls class="media-preview video-preview">
                                         <source src="{{ media_route }}">
@@ -139,15 +144,19 @@
 
             switch (msg.media_type) {
                 case "imagen":
+                    const thumbnailWrapper = document.createElement("div");
+                    thumbnailWrapper.className = "media-thumbnail-wrapper";
+                    
                     const imgLink = document.createElement("a");
                     imgLink.href = sourceUrl;
                     imgLink.target = "_blank";
                     imgLink.rel = "noopener";
-                    imgLink.download = "";
                     imgLink.className = "media-link";
+                    imgLink.title = "Haz clic para ver imagen completa";
+                    
                     const img = document.createElement("img");
                     img.src = sourceUrl;
-                    img.alt = "Imagen recibida";
+                    img.alt = "Imagen";
                     img.className = "media-preview";
                     img.onerror = function() {
                         // Si la imagen falla al cargar, mostrar un enlace de descarga
@@ -158,7 +167,20 @@
                         imgLink.appendChild(fallback);
                     };
                     imgLink.appendChild(img);
-                    mediaWrapper.appendChild(imgLink);
+                    
+                    const indicator = document.createElement("small");
+                    indicator.className = "media-indicator";
+                    indicator.style.display = "block";
+                    indicator.style.marginTop = "4px";
+                    indicator.style.opacity = "0.7";
+                    indicator.innerHTML = '<i class="fas fa-image"></i> Imagen';
+                    if (msg.sender_type === "customer") {
+                        indicator.style.color = "rgba(0, 0, 0, 0.6)";
+                    }
+                    
+                    thumbnailWrapper.appendChild(imgLink);
+                    thumbnailWrapper.appendChild(indicator);
+                    mediaWrapper.appendChild(thumbnailWrapper);
                     break;
                 case "video":
                     const video = document.createElement("video");

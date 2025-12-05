@@ -814,6 +814,11 @@ def index():
     # Si está autenticado, redirigir al panel
     return redirect(url_for('panel'))
 
+@app.route('/inicio')
+def inicio_publico():
+    """Página pública de inicio"""
+    return render_template('index.html')
+
 @app.route('/clientes')
 @login_required
 def clientes():
