@@ -15,6 +15,7 @@ from models import (
     WhatsAppConversation,
     WhatsAppMessage,
     Usuario,
+    PedidoEntreNaves,
 )
 from twilio_sender import enviar_whatsapp, configurar_twilio, twilio_sender
 from datetime import datetime, date, timezone
@@ -132,11 +133,13 @@ app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 # Configuración común
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['WHATSAPP_UPLOAD_FOLDER'] = 'static/whatsapp_uploads'
+app.config['PEDIDOS_UPLOAD_FOLDER'] = 'static/pedidos_uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Crear directorio de uploads si no existe  
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['WHATSAPP_UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['PEDIDOS_UPLOAD_FOLDER'], exist_ok=True)
 
 db.init_app(app)
 
@@ -241,6 +244,24 @@ with app.app_context():
                         print("✅ Columna 'tipo' añadida a la tabla 'whatsapp_conversation'")
         except Exception as e:
             print(f"⚠️ Error añadiendo columnas a whatsapp_conversation: {e}")
+            import traceback
+            print(traceback.format_exc())
+        
+        # Verificar y crear tabla de pedidos_entre_naves si no existe
+        try:
+            if 'pedido_entre_naves' not in inspector.get_table_names():
+                print("📦 Creando tabla 'pedido_entre_naves'...")
+                db.create_all()
+                print("✅ Tabla 'pedido_entre_naves' creada")
+            else:
+                # Verificar columnas existentes
+                pedido_columns = {col['name'] for col in inspector.get_columns('pedido_entre_naves')}
+                with db.engine.begin() as conn:
+                    if 'comentarios' not in pedido_columns:
+                        conn.execute(text("ALTER TABLE pedido_entre_naves ADD COLUMN comentarios TEXT"))
+                        print("✅ Columna 'comentarios' añadida a la tabla 'pedido_entre_naves'")
+        except Exception as e:
+            print(f"⚠️ Error verificando tabla pedido_entre_naves: {e}")
             import traceback
             print(traceback.format_exc())
             
@@ -3204,6 +3225,157 @@ def polling_mensajes():
 def activar_polling():
     """Página para activar el polling automático"""
     return render_template('activar_polling.html')
+
+
+# ============================================================================
+# RUTAS PARA PEDIDOS ENTRE NAVES
+# ============================================================================
+
+def _get_next_pedido_numero() -> int:
+    """Obtiene el siguiente número de pedido automáticamente"""
+    ultimo_pedido = PedidoEntreNaves.query.order_by(PedidoEntreNaves.numero.desc()).first()
+    if ultimo_pedido:
+        return ultimo_pedido.numero + 1
+    return 1
+
+
+@app.route('/whatsapp/pedidos-entre-naves')
+@login_required
+def pedidos_entre_naves():
+    """Lista todos los pedidos entre naves"""
+    # Obtener todos los pedidos ordenados por número descendente (más recientes primero)
+    pedidos = PedidoEntreNaves.query.order_by(PedidoEntreNaves.numero.desc()).all()
+    
+    # Pre-cargar usuarios para evitar N+1 queries
+    usuario_ids = set()
+    for pedido in pedidos:
+        usuario_ids.add(pedido.usuario_creador_id)
+        if pedido.usuario_completado_id:
+            usuario_ids.add(pedido.usuario_completado_id)
+    
+    usuarios_dict = {}
+    if usuario_ids:
+        usuarios = Usuario.query.filter(Usuario.id.in_(usuario_ids)).all()
+        usuarios_dict = {u.id: u for u in usuarios}
+    
+    # Añadir usuarios a los pedidos
+    for pedido in pedidos:
+        pedido._usuario_creador = usuarios_dict.get(pedido.usuario_creador_id)
+        pedido._usuario_completado = usuarios_dict.get(pedido.usuario_completado_id) if pedido.usuario_completado_id else None
+    
+    return render_template('whatsapp/pedidos_entre_naves.html', pedidos=pedidos)
+
+
+@app.route('/whatsapp/pedidos-entre-naves/nuevo', methods=['GET', 'POST'])
+@login_required
+def pedidos_entre_naves_nuevo():
+    """Crear un nuevo pedido entre naves"""
+    if request.method == 'POST':
+        descripcion = (request.form.get('descripcion') or '').strip()
+        imagen_file = request.files.get('imagen')
+        
+        if not descripcion:
+            flash('Debes escribir una descripción del pedido', 'error')
+            return render_template('whatsapp/pedidos_entre_naves_nuevo.html')
+        
+        try:
+            # Obtener el siguiente número de pedido
+            numero = _get_next_pedido_numero()
+            
+            imagen_url = None
+            if imagen_file and imagen_file.filename:
+                # Validar que sea una imagen
+                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                file_ext = imagen_file.filename.rsplit('.', 1)[1].lower() if '.' in imagen_file.filename else ''
+                
+                if file_ext not in allowed_extensions:
+                    flash('Solo se permiten archivos de imagen (PNG, JPG, JPEG, GIF, WEBP)', 'error')
+                    return render_template('whatsapp/pedidos_entre_naves_nuevo.html')
+                
+                # Guardar imagen
+                filename = secure_filename(f"pedido_{numero}_{datetime.now().timestamp()}_{imagen_file.filename}")
+                filepath = os.path.join(app.config['PEDIDOS_UPLOAD_FOLDER'], filename)
+                imagen_file.save(filepath)
+                
+                # Generar URL pública para la imagen
+                base_url = (
+                    os.environ.get('PUBLIC_BASE_URL')
+                    or os.environ.get('RENDER_EXTERNAL_URL')
+                    or os.environ.get('EXTERNAL_URL')
+                    or request.url_root.rstrip('/')
+                )
+                imagen_url = f"{base_url}/whatsapp/pedidos/uploads/{filename}"
+            
+            # Crear el pedido
+            pedido = PedidoEntreNaves(
+                numero=numero,
+                descripcion=descripcion,
+                imagen_url=imagen_url,
+                estado='pendiente',
+                usuario_creador_id=current_user.id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.session.add(pedido)
+            db.session.commit()
+            
+            flash(f'Pedido #{numero} creado correctamente', 'success')
+            return redirect(url_for('pedidos_entre_naves'))
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            flash(f'Error creando pedido: {exc}', 'error')
+            return render_template('whatsapp/pedidos_entre_naves_nuevo.html')
+    
+    return render_template('whatsapp/pedidos_entre_naves_nuevo.html')
+
+
+@app.route('/whatsapp/pedidos-entre-naves/<int:pedido_id>/completar', methods=['POST'])
+@login_required
+def pedidos_entre_naves_completar(pedido_id):
+    """Marcar un pedido como completado o incidencia y añadir comentarios"""
+    pedido = PedidoEntreNaves.query.get_or_404(pedido_id)
+    
+    # Si ya está marcado como "listo", no permitir cambios
+    if pedido.estado == 'listo':
+        flash('Este pedido ya está marcado como listo', 'warning')
+        return redirect(url_for('pedidos_entre_naves'))
+    
+    comentarios = (request.form.get('comentarios') or '').strip()
+    accion = request.form.get('accion', 'listo')  # Por defecto 'listo', puede ser 'incidencia'
+    
+    # Validar que la acción sea válida
+    if accion not in ['listo', 'incidencia']:
+        accion = 'listo'
+    
+    # Si el pedido está en "incidencia" y se quiere marcar como "listo", permitirlo
+    # Si está en "pendiente", permitir cualquier cambio
+    
+    try:
+        pedido.estado = accion
+        # Si hay comentarios nuevos, actualizarlos; si no, mantener los existentes si no se borran
+        if comentarios:
+            pedido.comentarios = comentarios
+        # Si el estado cambia a "listo" desde "incidencia", actualizar usuario y fecha
+        if accion == 'listo' or pedido.usuario_completado_id is None:
+            pedido.usuario_completado_id = current_user.id
+            pedido.fecha_completado = datetime.utcnow()
+        pedido.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        estado_texto = 'listo' if accion == 'listo' else 'incidencia'
+        flash(f'Pedido #{pedido.numero} marcado como {estado_texto}', 'success' if accion == 'listo' else 'error')
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f'Error actualizando pedido: {exc}', 'error')
+    
+    return redirect(url_for('pedidos_entre_naves'))
+
+
+@app.route('/whatsapp/pedidos/uploads/<filename>')
+def pedidos_uploaded_file(filename):
+    """Servir imágenes subidas para pedidos entre naves"""
+    return send_from_directory(app.config['PEDIDOS_UPLOAD_FOLDER'], filename)
+
 
 if __name__ == '__main__':
     with app.app_context():

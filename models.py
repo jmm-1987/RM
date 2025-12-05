@@ -220,3 +220,26 @@ class WhatsAppMessage(db.Model):
 
     def __repr__(self):
         return f'<WhatsAppMessage {self.id} {self.sender_type}>'
+
+
+class PedidoEntreNaves(db.Model):
+    __tablename__ = 'pedido_entre_naves'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.Integer, unique=True, nullable=False, index=True)  # Numeración automática
+    descripcion = db.Column(db.Text, nullable=False)  # Texto del pedido
+    imagen_url = db.Column(db.String(500))  # URL de la imagen
+    estado = db.Column(db.String(20), default='pendiente', nullable=False, index=True)  # 'pendiente', 'listo' o 'incidencia'
+    comentarios = db.Column(db.Text)  # Comentarios adicionales cuando se marca como listo
+    usuario_creador_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    usuario_completado_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    fecha_completado = db.Column(db.DateTime, nullable=True)
+    
+    # Relaciones
+    usuario_creador = db.relationship('Usuario', foreign_keys=[usuario_creador_id], backref='pedidos_creados')
+    usuario_completado = db.relationship('Usuario', foreign_keys=[usuario_completado_id], backref='pedidos_completados')
+    
+    def __repr__(self):
+        return f'<PedidoEntreNaves #{self.numero} - {self.estado}>'

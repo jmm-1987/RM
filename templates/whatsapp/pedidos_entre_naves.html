@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Pedidos entre Naves | WhatsApp{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='whatsapp.css') }}">
+<style>
+    .pedidos-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    @media (max-width: 1200px) {
+        .pedidos-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (max-width: 768px) {
+        .pedidos-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .pedido-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    .pedido-card:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .pedido-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    .pedido-numero {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+    .pedido-estado {
+        padding: 0.3rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .estado-pendiente {
+        background: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.4);
+    }
+    .estado-listo {
+        background: rgba(40, 167, 69, 0.2);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.4);
+    }
+    .estado-incidencia {
+        background: rgba(220, 53, 69, 0.2);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.4);
+    }
+    .pedido-descripcion {
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 0.75rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        font-size: 0.95rem;
+    }
+    .pedido-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+    }
+    .pedido-comentarios {
+        background: rgba(40, 167, 69, 0.1);
+        border-left: 3px solid #28a745;
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.9);
+        white-space: pre-wrap;
+        font-size: 0.9rem;
+    }
+    .completar-form {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .completar-form textarea {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+    .completar-form textarea::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 header-actions">
+    <div>
+        <h1 class="h3 mb-1 fw-bold">Pedidos entre Naves</h1>
+        <p class="text-muted mb-0">Gestiona los pedidos entre diferentes naves</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('pedidos_entre_naves_nuevo') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nuevo Pedido
+        </a>
+        <a href="{{ url_for('whatsapp_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a WhatsApp
+        </a>
+    </div>
+</div>
+
+{% if pedidos %}
+    <div class="pedidos-grid">
+    {% for pedido in pedidos %}
+    <div class="pedido-card">
+        <div class="pedido-header">
+            <div>
+                <span class="pedido-numero">Pedido #{{ pedido.numero }}</span>
+            </div>
+            <span class="pedido-estado estado-{{ pedido.estado }}">
+                {% if pedido.estado == 'pendiente' %}
+                    <i class="fas fa-clock"></i> Pendiente
+                {% elif pedido.estado == 'listo' %}
+                    <i class="fas fa-check-circle"></i> Listo
+                {% elif pedido.estado == 'incidencia' %}
+                    <i class="fas fa-exclamation-triangle"></i> Incidencia
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="pedido-descripcion">{{ pedido.descripcion }}</div>
+        
+        {% if pedido.imagen_url %}
+        <div class="mb-2">
+            <a href="{{ pedido.imagen_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-image"></i> Ver Imagen
+            </a>
+        </div>
+        {% endif %}
+        
+        <div class="pedido-meta">
+            <div>
+                <i class="fas fa-user"></i> Creado por: <strong>{{ pedido._usuario_creador.username if pedido._usuario_creador else 'Usuario desconocido' }}</strong>
+            </div>
+            <div>
+                <i class="fas fa-calendar"></i> Fecha: <strong>{{ pedido.created_at.strftime("%d/%m/%Y %H:%M") if pedido.created_at else "N/D" }}</strong>
+            </div>
+            {% if pedido.estado in ['listo', 'incidencia'] and pedido._usuario_completado %}
+            <div>
+                <i class="fas fa-check"></i> {% if pedido.estado == 'incidencia' %}Marcado como incidencia por{% else %}Completado por{% endif %}: <strong>{{ pedido._usuario_completado.username }}</strong>
+            </div>
+            {% if pedido.fecha_completado %}
+            <div>
+                <i class="fas fa-calendar-check"></i> Fecha {% if pedido.estado == 'incidencia' %}incidencia{% else %}completado{% endif %}: <strong>{{ pedido.fecha_completado.strftime("%d/%m/%Y %H:%M") }}</strong>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+        
+        {% if pedido.estado in ['listo', 'incidencia'] and pedido.comentarios %}
+        <div class="pedido-comentarios" {% if pedido.estado == 'incidencia' %}style="background: rgba(220, 53, 69, 0.1); border-left-color: #dc3545;"{% endif %}>
+            <strong><i class="fas fa-comment"></i> Comentarios:</strong><br>
+            {{ pedido.comentarios }}
+        </div>
+        {% endif %}
+        
+        {% if pedido.estado == 'pendiente' %}
+        <div class="completar-form">
+            <form method="POST" action="{{ url_for('pedidos_entre_naves_completar', pedido_id=pedido.id) }}" style="margin-bottom: 0.75rem;">
+                <div class="mb-2">
+                    <label for="comentarios-{{ pedido.id }}" class="form-label" style="color: rgba(255, 255, 255, 0.9);">
+                        <i class="fas fa-comment"></i> Añadir comentarios (opcional):
+                    </label>
+                    <textarea 
+                        name="comentarios" 
+                        id="comentarios-{{ pedido.id }}" 
+                        class="form-control" 
+                        rows="3" 
+                        placeholder="Escribe comentarios adicionales sobre este pedido..."
+                    ></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" name="accion" value="listo" class="btn btn-success">
+                        <i class="fas fa-check"></i> Marcar como Listo
+                    </button>
+                    <button type="submit" name="accion" value="incidencia" class="btn btn-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Marcar como Incidencia
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% elif pedido.estado == 'incidencia' %}
+        <div class="completar-form">
+            <form method="POST" action="{{ url_for('pedidos_entre_naves_completar', pedido_id=pedido.id) }}" style="margin-bottom: 0.75rem;">
+                <div class="mb-2">
+                    <label for="comentarios-update-{{ pedido.id }}" class="form-label" style="color: rgba(255, 255, 255, 0.9);">
+                        <i class="fas fa-comment"></i> Actualizar comentarios (opcional):
+                    </label>
+                    <textarea 
+                        name="comentarios" 
+                        id="comentarios-update-{{ pedido.id }}" 
+                        class="form-control" 
+                        rows="3" 
+                        placeholder="Escribe comentarios adicionales o actualiza los existentes..."
+                    >{{ pedido.comentarios or '' }}</textarea>
+                </div>
+                <button type="submit" name="accion" value="listo" class="btn btn-success">
+                    <i class="fas fa-check"></i> Marcar como Listo
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-box-open"></i>
+        <h3>No hay pedidos</h3>
+        <p>Comienza creando tu primer pedido entre naves</p>
+        <a href="{{ url_for('pedidos_entre_naves_nuevo') }}" class="btn btn-success mt-3">
+            <i class="fas fa-plus"></i> Crear Primer Pedido
+        </a>
+    </div>
+{% endif %}
+{% endblock %}
+

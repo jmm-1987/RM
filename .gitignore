@@ -47,6 +47,10 @@ venv.bak/
 static/whatsapp_uploads/*
 !static/whatsapp_uploads/.gitkeep
 
+# Archivos temporales de Pedidos entre Naves (imágenes subidas)
+static/pedidos_uploads/*
+!static/pedidos_uploads/.gitkeep
+
 # Archivos del sistema
 .DS_Store
 Thumbs.db
