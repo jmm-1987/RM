@@ -222,6 +222,27 @@ with app.app_context():
                         print("✅ Columna 'codigo' añadida a la tabla 'cliente'")
         except Exception as e:
             print(f"⚠️ Error añadiendo columna codigo a cliente: {e}")
+        
+        # Migraciones para whatsapp_conversation
+        try:
+            if 'whatsapp_conversation' in inspector.get_table_names():
+                conversation_columns = {col['name'] for col in inspector.get_columns('whatsapp_conversation')}
+                with db.engine.begin() as conn:
+                    if 'anotaciones' not in conversation_columns:
+                        conn.execute(text("ALTER TABLE whatsapp_conversation ADD COLUMN anotaciones TEXT"))
+                        print("✅ Columna 'anotaciones' añadida a la tabla 'whatsapp_conversation'")
+                    if 'tipo' not in conversation_columns:
+                        conn.execute(text("ALTER TABLE whatsapp_conversation ADD COLUMN tipo VARCHAR(32)"))
+                        # Crear índice para el campo tipo
+                        try:
+                            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_whatsapp_conversation_tipo ON whatsapp_conversation(tipo)"))
+                        except Exception:
+                            pass  # El índice puede ya existir
+                        print("✅ Columna 'tipo' añadida a la tabla 'whatsapp_conversation'")
+        except Exception as e:
+            print(f"⚠️ Error añadiendo columnas a whatsapp_conversation: {e}")
+            import traceback
+            print(traceback.format_exc())
             
         print("✅ Base de datos inicializada correctamente")
         
@@ -2805,6 +2826,9 @@ def whatsapp_api_conversations():
     # Optimización: Usar subconsulta para obtener el último mensaje de cada conversación
     # y ordenar por el sent_at del último mensaje (no por updated_at)
     
+    # Filtrar por tipo si se especifica en los parámetros
+    tipo_filter = request.args.get('tipo', default=None, type=str)
+    
     # Subconsulta para obtener el último sent_at de cada conversación
     last_message_subquery = db.session.query(
         WhatsAppMessage.conversation_id,
@@ -2812,16 +2836,20 @@ def whatsapp_api_conversations():
     ).group_by(WhatsAppMessage.conversation_id).subquery()
     
     # Obtener conversaciones ordenadas por el último mensaje (sent_at)
-    conversations = db.session.query(WhatsAppConversation)\
+    query = db.session.query(WhatsAppConversation)\
         .outerjoin(
             last_message_subquery,
             WhatsAppConversation.id == last_message_subquery.c.conversation_id
-        )\
-        .order_by(
-            func.coalesce(last_message_subquery.c.last_sent_at, WhatsAppConversation.updated_at).desc(),
-            WhatsAppConversation.id.desc()
-        )\
-        .all()
+        )
+    
+    # Aplicar filtro por tipo si se especifica
+    if tipo_filter:
+        query = query.filter(WhatsAppConversation.tipo == tipo_filter)
+    
+    conversations = query.order_by(
+        func.coalesce(last_message_subquery.c.last_sent_at, WhatsAppConversation.updated_at).desc(),
+        WhatsAppConversation.id.desc()
+    ).all()
     
     # Pre-cargar unread counts con una sola query para todas las conversaciones
     conversation_ids = [c.id for c in conversations]
@@ -2915,9 +2943,74 @@ def whatsapp_api_conversations():
             "updated_at_human": _to_local_time(conv.updated_at).strftime("%d/%m/%Y %H:%M") if conv.updated_at else "",
             "unread_count": unread_counts.get(conv.id, 0),
             "url": url_for("whatsapp_conversation_detail", conversation_id=conv.id),
+            "anotaciones": conv.anotaciones or "",
+            "tipo": conv.tipo or None,
         })
     
     return jsonify({'conversations': data})
+
+
+@app.put('/whatsapp/api/conversaciones/<int:conversation_id>/anotaciones')
+@login_required
+def whatsapp_api_update_anotaciones(conversation_id):
+    """Actualizar las anotaciones de una conversación"""
+    conversation = WhatsAppConversation.query.get_or_404(conversation_id)
+    data = request.get_json()
+    
+    if data is None:
+        return jsonify({'error': 'Datos JSON requeridos'}), 400
+    
+    anotaciones = data.get('anotaciones', '').strip()
+    conversation.anotaciones = anotaciones if anotaciones else None
+    conversation.updated_at = datetime.now(timezone.utc)
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'anotaciones': conversation.anotaciones or '',
+            'message': 'Anotaciones actualizadas correctamente'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Error actualizando anotaciones: {str(e)}'}), 500
+
+
+@app.put('/whatsapp/api/conversaciones/<int:conversation_id>/tipo')
+@login_required
+def whatsapp_api_update_tipo(conversation_id):
+    """Actualizar el tipo de una conversación"""
+    conversation = WhatsAppConversation.query.get_or_404(conversation_id)
+    data = request.get_json()
+    
+    if data is None:
+        return jsonify({'error': 'Datos JSON requeridos'}), 400
+    
+    tipo_raw = data.get('tipo')
+    
+    # Manejar None, null (string), o string vacío como None
+    if tipo_raw is None or tipo_raw == 'null' or (isinstance(tipo_raw, str) and tipo_raw.strip() == ''):
+        tipo = None
+    else:
+        tipo = str(tipo_raw).strip()
+    
+    # Validar que el tipo sea válido (None o 'administracion')
+    if tipo is not None and tipo != 'administracion':
+        return jsonify({'error': f'Tipo inválido: {tipo}. Solo se permite "administracion" o null'}), 400
+    
+    conversation.tipo = tipo
+    conversation.updated_at = datetime.now(timezone.utc)
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'tipo': conversation.tipo,
+            'message': 'Tipo de conversación actualizado correctamente'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Error actualizando tipo: {str(e)}'}), 500
 
 
 @app.get('/whatsapp/api/conversaciones/<int:conversation_id>/mensajes')

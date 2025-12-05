@@ -26,6 +26,34 @@
             </small>
         </div>
     </div>
+    <!-- Sección de anotaciones -->
+    <div class="card-body border-bottom" style="background: rgba(102, 126, 234, 0.15); padding: 1rem;">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <label class="mb-0 fw-bold" style="color: #667eea;">
+                <i class="fas fa-sticky-note"></i> Anotaciones:
+            </label>
+            <button 
+                type="button" 
+                class="btn btn-sm btn-outline-primary" 
+                id="toggle-edit-anotaciones"
+                title="Habilitar edición"
+            >
+                <i class="fas fa-edit"></i> Editar
+            </button>
+        </div>
+        <input 
+            type="text" 
+            class="form-control fw-bold" 
+            id="anotaciones-input" 
+            value="{{ conversation.anotaciones or '' }}"
+            placeholder="Escribe una anotación aquí..."
+            readonly
+            style="background: rgba(255, 255, 255, 0.95); border: 2px solid #667eea; font-weight: bold; color: #333;"
+        >
+        <small class="text-muted d-none" id="anotaciones-saving" style="color: #667eea !important;">
+            <i class="fas fa-spinner fa-spin"></i> Guardando...
+        </small>
+    </div>
     <div
         class="card-body conversation-thread"
         id="conversation-thread"
@@ -121,6 +149,10 @@
                             <i class="fas fa-image"></i>
                         </label>
                         <input type="file" id="image-input" name="image" accept="image/*" style="display: none;">
+                        <label for="camera-input" class="btn btn-outline-success mb-0" style="cursor: pointer;" title="Tomar foto con la cámara">
+                            <i class="fas fa-camera"></i>
+                        </label>
+                        <input type="file" id="camera-input" name="image" accept="image/*" capture="environment" style="display: none;">
                     </div>
                 </div>
             </div>
@@ -339,37 +371,68 @@
     const textarea = document.getElementById("message-input");
     const feedback = document.getElementById("send-feedback");
     const imageInput = document.getElementById("image-input");
+    const cameraInput = document.getElementById("camera-input");
     const imagePreview = document.getElementById("image-preview");
     const imagePreviewContainer = document.getElementById("image-preview-container");
     const removeImageBtn = document.getElementById("remove-image-btn");
     const sendBtn = document.getElementById("send-btn");
 
-    // Manejar selección de imagen
+    // Función compartida para manejar la selección de imagen
+    function handleImageSelection(file, sourceInput) {
+        if (!file) return false;
+        
+        // Validar que sea una imagen
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor, selecciona un archivo de imagen válido');
+            if (sourceInput) sourceInput.value = '';
+            return false;
+        }
+
+        // Validar tamaño (máximo 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('La imagen es demasiado grande. Máximo 5MB');
+            if (sourceInput) sourceInput.value = '';
+            return false;
+        }
+
+        // Mostrar preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.src = e.target.result;
+            imagePreviewContainer.classList.remove("d-none");
+        };
+        reader.readAsDataURL(file);
+        return true;
+    }
+
+    // Manejar selección de imagen desde archivo
     if (imageInput) {
         imageInput.addEventListener("change", function(event) {
             const file = event.target.files[0];
             if (file) {
-                // Validar que sea una imagen
-                if (!file.type.startsWith('image/')) {
-                    alert('Por favor, selecciona un archivo de imagen válido');
-                    imageInput.value = '';
-                    return;
+                if (handleImageSelection(file, imageInput)) {
+                    // Limpiar el input de cámara si había algo seleccionado
+                    if (cameraInput) {
+                        cameraInput.value = '';
+                    }
                 }
+            }
+        });
+    }
 
-                // Validar tamaño (máximo 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('La imagen es demasiado grande. Máximo 5MB');
-                    imageInput.value = '';
-                    return;
+    // Manejar captura de foto desde la cámara
+    if (cameraInput) {
+        cameraInput.addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (handleImageSelection(file, cameraInput)) {
+                    // Copiar el archivo al input de imagen principal para que se envíe con el formulario
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    if (imageInput) {
+                        imageInput.files = dataTransfer.files;
+                    }
                 }
-
-                // Mostrar preview
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    imagePreview.src = e.target.result;
-                    imagePreviewContainer.classList.remove("d-none");
-                };
-                reader.readAsDataURL(file);
             }
         });
     }
@@ -379,6 +442,9 @@
         removeImageBtn.addEventListener("click", function() {
             if (imageInput) {
                 imageInput.value = '';
+            }
+            if (cameraInput) {
+                cameraInput.value = '';
             }
             if (imagePreview) {
                 imagePreview.src = '';
@@ -400,12 +466,21 @@
         form.addEventListener("submit", function(event) {
             // Validar que haya mensaje o imagen
             const hasMessage = textarea.value.trim().length > 0;
-            const hasImage = imageInput && imageInput.files.length > 0;
+            const hasImage = (imageInput && imageInput.files.length > 0) || (cameraInput && cameraInput.files.length > 0);
 
             if (!hasMessage && !hasImage) {
                 event.preventDefault();
                 alert('Debes escribir un mensaje o adjuntar una imagen');
                 return false;
+            }
+
+            // Si hay foto de cámara pero no en imageInput, copiarla al input principal
+            if (cameraInput && cameraInput.files.length > 0 && (!imageInput || imageInput.files.length === 0)) {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(cameraInput.files[0]);
+                if (imageInput) {
+                    imageInput.files = dataTransfer.files;
+                }
             }
 
             // Remover el atributo required del textarea si hay imagen
@@ -452,6 +527,113 @@
     }
 
     thread.scrollTop = thread.scrollHeight;
+})();
+
+// Gestión de anotaciones
+(function() {
+    const anotacionesInput = document.getElementById("anotaciones-input");
+    const toggleEditBtn = document.getElementById("toggle-edit-anotaciones");
+    const savingIndicator = document.getElementById("anotaciones-saving");
+    const conversationId = {{ conversation.id }};
+    
+    let isEditing = false;
+    let saveTimeout = null;
+    
+    if (!anotacionesInput || !toggleEditBtn) {
+        return;
+    }
+    
+    // Función para guardar anotaciones
+    function saveAnotaciones() {
+        const anotaciones = anotacionesInput.value.trim();
+        
+        if (savingIndicator) {
+            savingIndicator.classList.remove("d-none");
+        }
+        
+        fetch(`/whatsapp/api/conversaciones/${conversationId}/anotaciones`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                anotaciones: anotaciones
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (savingIndicator) {
+                savingIndicator.classList.add("d-none");
+            }
+            if (!data.success) {
+                console.error('Error guardando anotaciones:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (savingIndicator) {
+                savingIndicator.classList.add("d-none");
+            }
+        });
+    }
+    
+    // Toggle edición
+    toggleEditBtn.addEventListener('click', function() {
+        isEditing = !isEditing;
+        
+        if (isEditing) {
+            anotacionesInput.removeAttribute('readonly');
+            anotacionesInput.style.borderColor = '#28a745';
+            anotacionesInput.style.background = '#fff';
+            anotacionesInput.focus();
+            toggleEditBtn.innerHTML = '<i class="fas fa-lock"></i> Bloquear';
+            toggleEditBtn.title = 'Deshabilitar edición';
+            toggleEditBtn.classList.remove('btn-outline-primary');
+            toggleEditBtn.classList.add('btn-success');
+        } else {
+            anotacionesInput.setAttribute('readonly', 'readonly');
+            anotacionesInput.style.borderColor = '#667eea';
+            anotacionesInput.style.background = 'rgba(255, 255, 255, 0.95)';
+            toggleEditBtn.innerHTML = '<i class="fas fa-edit"></i> Editar';
+            toggleEditBtn.title = 'Habilitar edición';
+            toggleEditBtn.classList.remove('btn-success');
+            toggleEditBtn.classList.add('btn-outline-primary');
+            
+            // Guardar al deshabilitar edición
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            saveAnotaciones();
+        }
+    });
+    
+    // Guardar automáticamente mientras se escribe (con debounce)
+    anotacionesInput.addEventListener('input', function() {
+        if (!isEditing) return;
+        
+        // Cancelar guardado anterior si existe
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+        
+        // Guardar después de 1 segundo sin escribir
+        saveTimeout = setTimeout(function() {
+            saveAnotaciones();
+        }, 1000);
+    });
+    
+    // Guardar al presionar Enter
+    anotacionesInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && isEditing) {
+            e.preventDefault();
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            saveAnotaciones();
+            // Opcional: deshabilitar edición después de guardar
+            // toggleEditBtn.click();
+        }
+    });
 })();
 </script>
 {% endblock %}

@@ -86,16 +86,29 @@
             <i class="fas fa-times"></i>
         </button>
     </div>
-    <div class="form-check">
-        <input 
-            class="form-check-input" 
-            type="checkbox" 
-            id="filter-unread" 
-            style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3);"
-        >
-        <label class="form-check-label" for="filter-unread" style="color: #fff; cursor: pointer;">
-            <i class="fas fa-envelope"></i> Mostrar solo conversaciones con mensajes no leídos
-        </label>
+    <div class="d-flex flex-wrap gap-3">
+        <div class="form-check">
+            <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="filter-unread" 
+                style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3);"
+            >
+            <label class="form-check-label" for="filter-unread" style="color: #fff; cursor: pointer;">
+                <i class="fas fa-envelope"></i> Mostrar solo conversaciones con mensajes no leídos
+            </label>
+        </div>
+        <div class="form-check">
+            <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="filter-administracion" 
+                style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3);"
+            >
+            <label class="form-check-label" for="filter-administracion" style="color: #fff; cursor: pointer;">
+                <i class="fas fa-briefcase"></i> Mostrar solo conversaciones de administración
+            </label>
+        </div>
     </div>
 </div>
 
@@ -104,49 +117,85 @@
         {% for conversation in conversaciones %}
             {% set last = conversation._last_message %}
             {% set unread = conversation._unread_count %}
-            <a class="conversation-tile" href="{{ url_for('whatsapp_conversation_detail', conversation_id=conversation.id) }}">
-                <div class="tile-header d-flex justify-content-between align-items-center">
-                    <div class="tile-name">{{ conversation.contact_name or conversation.contact_number|chat_display }}</div>
-                    <div class="d-flex align-items-center gap-2">
-                        {% set last_agent = conversation._last_agent_message %}
-                        {% if last_agent and last_agent.usuario %}
-                            <span class="badge" style="background-color: {{ last_agent.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
-                                <i class="fas fa-user"></i> Último usuario: {{ last_agent.usuario.username }}
-                            </span>
-                        {% endif %}
-                        <div class="tile-meta">
-                            {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+            <div class="conversation-tile-wrapper position-relative">
+                <a class="conversation-tile" href="{{ url_for('whatsapp_conversation_detail', conversation_id=conversation.id) }}">
+                    <div class="tile-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <div class="tile-name">{{ conversation.contact_name or conversation.contact_number|chat_display }}</div>
+                            {% if conversation.tipo == 'administracion' %}
+                                <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">
+                                    <i class="fas fa-briefcase"></i> Administración
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% set last_agent = conversation._last_agent_message %}
+                            {% if last_agent and last_agent.usuario %}
+                                <span class="badge" style="background-color: {{ last_agent.usuario.color or '#007bff' }}; color: white; font-size: 0.75rem;">
+                                    <i class="fas fa-user"></i> Último usuario: {{ last_agent.usuario.username }}
+                                </span>
+                            {% endif %}
+                            <div class="tile-meta">
+                                {{ (conversation.updated_at | local_time).strftime("%d/%m/%Y %H:%M") if conversation.updated_at else "" }}
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="tile-snippet">
-                    {% if last %}
-                        {% if last.sender_type == 'agent' %}
-                            {% if last.usuario %}
-                                {% set prefix = last.usuario.username ~ ':' %}
+                    {% if conversation.anotaciones %}
+                    <div class="tile-anotaciones mb-2" style="font-size: 0.85rem; color: #ffc107; font-style: italic; padding: 0.25rem 0.5rem; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                        <i class="fas fa-sticky-note"></i> {{ conversation.anotaciones[:100] }}{% if conversation.anotaciones|length > 100 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                    <div class="tile-snippet">
+                        {% if last %}
+                            {% if last.sender_type == 'agent' %}
+                                {% if last.usuario %}
+                                    {% set prefix = last.usuario.username ~ ':' %}
+                                {% else %}
+                                    {% set prefix = 'Sistema:' %}
+                                {% endif %}
                             {% else %}
-                                {% set prefix = 'Sistema:' %}
+                                {% set prefix = (conversation.contact_name or conversation.contact_number|chat_display) ~ ':' %}
+                            {% endif %}
+                            {% if last.message_text %}
+                                {{ prefix }} {{ last.message_text }}
+                            {% elif last.media_type %}
+                                {{ prefix }} [{{ last.media_type|title }}]
+                            {% else %}
+                                {{ prefix }} Mensaje
                             {% endif %}
                         {% else %}
-                            {% set prefix = (conversation.contact_name or conversation.contact_number|chat_display) ~ ':' %}
+                            Sin mensajes todavía
                         {% endif %}
-                        {% if last.message_text %}
-                            {{ prefix }} {{ last.message_text }}
-                        {% elif last.media_type %}
-                            {{ prefix }} [{{ last.media_type|title }}]
-                        {% else %}
-                            {{ prefix }} Mensaje
-                        {% endif %}
-                    {% else %}
-                        Sin mensajes todavía
+                    </div>
+                    {% if unread %}
+                    <div class="tile-footer mt-2">
+                        <span class="badge bg-danger">{{ unread }} sin leer</span>
+                    </div>
                     {% endif %}
+                </a>
+                <div class="tile-actions position-absolute top-0 end-0 p-2" style="z-index: 10;" onclick="event.stopPropagation();">
+                    <div class="btn-group-vertical btn-group-sm">
+                        <button 
+                            class="btn btn-sm btn-outline-warning" 
+                            type="button"
+                            onclick="event.preventDefault(); editarAnotaciones({{ conversation.id }}, {{ (conversation.anotaciones or '')|tojson }});"
+                            title="Editar anotaciones"
+                            style="padding: 0.25rem 0.5rem;"
+                        >
+                            <i class="fas fa-sticky-note"></i>
+                        </button>
+                        <button 
+                            class="btn btn-sm {{ 'btn-warning' if conversation.tipo == 'administracion' else 'btn-outline-secondary' }}" 
+                            type="button"
+                            onclick="event.preventDefault(); toggleTipoAdministracion({{ conversation.id }}, {{ 'true' if conversation.tipo == 'administracion' else 'false' }});"
+                            title="{{ 'Quitar tipo administración' if conversation.tipo == 'administracion' else 'Marcar como administración' }}"
+                            style="padding: 0.25rem 0.5rem;"
+                        >
+                            <i class="fas fa-briefcase"></i>
+                        </button>
+                    </div>
                 </div>
-                {% if unread %}
-                <div class="tile-footer mt-2">
-                    <span class="badge bg-danger">{{ unread }} sin leer</span>
-                </div>
-                {% endif %}
-            </a>
+            </div>
         {% endfor %}
     </div>
 </div>
@@ -168,14 +217,78 @@
     const searchInput = document.getElementById("conversation-search");
     const clearSearchBtn = document.getElementById("clear-search");
     const filterUnreadCheckbox = document.getElementById("filter-unread");
+    const filterAdministracionCheckbox = document.getElementById("filter-administracion");
     
     let allConversations = []; // Almacenar todas las conversaciones para filtrar
 
-        if (!listElement) {
+    if (!listElement) {
         return;
     }
 
     const apiUrl = "{{ url_for('whatsapp_api_conversations') }}";
+    
+    // Inicializar allConversations con las conversaciones del DOM inicial si existen
+    // Esto permite que los filtros funcionen inmediatamente al cargar la página
+    function initializeConversationsFromDOM() {
+        const tiles = listElement.querySelectorAll('.conversation-tile-wrapper');
+        if (tiles.length === 0) return;
+        
+        const conversations = [];
+        tiles.forEach((tile) => {
+            const link = tile.querySelector('.conversation-tile');
+            if (!link) return;
+            
+            const href = link.getAttribute('href');
+            const match = href.match(/\/whatsapp\/conversaciones\/(\d+)/);
+            if (!match) return;
+            
+            const conversationId = parseInt(match[1]);
+            const nameElement = link.querySelector('.tile-name');
+            const displayName = nameElement ? nameElement.textContent.trim() : '';
+            
+            // Verificar si tiene badge de administración
+            const adminBadge = link.querySelector('.badge.bg-warning.text-dark');
+            const tipo = adminBadge ? 'administracion' : null;
+            
+            // Verificar si tiene anotaciones
+            const anotacionesElement = link.querySelector('.tile-anotaciones');
+            let anotaciones = '';
+            if (anotacionesElement) {
+                const text = anotacionesElement.textContent || anotacionesElement.innerText || '';
+                anotaciones = text.replace(/.*?fa-sticky-note.*?\s+/, '').trim();
+            }
+            
+            // Verificar mensajes no leídos
+            const unreadBadge = link.querySelector('.badge.bg-danger');
+            const unreadCount = unreadBadge ? parseInt((unreadBadge.textContent || '0').match(/\d+/)?.[0] || '0') : 0;
+            
+            // Obtener último mensaje
+            const snippetElement = link.querySelector('.tile-snippet');
+            const lastMessageText = snippetElement ? (snippetElement.textContent || snippetElement.innerText || '').trim() : '';
+            
+            // Obtener fecha
+            const metaElement = link.querySelector('.tile-meta');
+            const updatedAtHuman = metaElement ? (metaElement.textContent || metaElement.innerText || '').trim() : '';
+            
+            conversations.push({
+                id: conversationId,
+                display_name: displayName,
+                tipo: tipo,
+                anotaciones: anotaciones,
+                unread_count: unreadCount,
+                last_message_text: lastMessageText,
+                updated_at_human: updatedAtHuman,
+                url: href
+            });
+        });
+        
+        if (conversations.length > 0) {
+            allConversations = conversations;
+        }
+    }
+    
+    // Inicializar conversaciones desde el DOM si existen
+    initializeConversationsFromDOM();
 
     function renderConversations(items) {
         if (!items.length) {
@@ -199,6 +312,9 @@
         listElement.innerHTML = "";
 
         items.forEach((item) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "conversation-tile-wrapper position-relative";
+            
             const link = document.createElement("a");
             link.className = "conversation-tile";
             link.href = item.url;
@@ -206,9 +322,22 @@
             const header = document.createElement("div");
             header.className = "tile-header d-flex justify-content-between align-items-center";
 
+            const leftSide = document.createElement("div");
+            leftSide.className = "d-flex align-items-center gap-2 flex-grow-1";
+            
             const name = document.createElement("div");
             name.className = "tile-name";
             name.textContent = item.display_name;
+            leftSide.appendChild(name);
+            
+            // Badge de tipo administración
+            if (item.tipo === 'administracion') {
+                const tipoBadge = document.createElement("span");
+                tipoBadge.className = "badge bg-warning text-dark";
+                tipoBadge.style.fontSize = "0.7rem";
+                tipoBadge.innerHTML = '<i class="fas fa-briefcase"></i> Administración';
+                leftSide.appendChild(tipoBadge);
+            }
 
             const rightSide = document.createElement("div");
             rightSide.className = "d-flex align-items-center gap-2";
@@ -230,8 +359,18 @@
             meta.textContent = item.updated_at_human || "";
             rightSide.appendChild(meta);
 
-            header.appendChild(name);
+            header.appendChild(leftSide);
             header.appendChild(rightSide);
+
+            // Añadir anotaciones si existen
+            if (item.anotaciones) {
+                const anotacionesDiv = document.createElement("div");
+                anotacionesDiv.className = "tile-anotaciones mb-2";
+                anotacionesDiv.style.cssText = "font-size: 0.85rem; color: #ffc107; font-style: italic; padding: 0.25rem 0.5rem; background: rgba(255, 193, 7, 0.1); border-radius: 4px;";
+                const anotacionesText = item.anotaciones.length > 100 ? item.anotaciones.substring(0, 100) + '...' : item.anotaciones;
+                anotacionesDiv.innerHTML = `<i class="fas fa-sticky-note"></i> ${anotacionesText}`;
+                link.appendChild(anotacionesDiv);
+            }
 
             const snippet = document.createElement("div");
             snippet.className = "tile-snippet";
@@ -268,12 +407,57 @@
                 footer.appendChild(unreadBadge);
                 link.appendChild(footer);
             }
-
-            listElement.appendChild(link);
+            
+            // Botones de acción
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "tile-actions position-absolute top-0 end-0 p-2";
+            actionsDiv.style.zIndex = "10";
+            actionsDiv.onclick = (e) => e.stopPropagation();
+            
+            const btnGroup = document.createElement("div");
+            btnGroup.className = "btn-group-vertical btn-group-sm";
+            
+            // Botón editar anotaciones
+            const btnAnotaciones = document.createElement("button");
+            btnAnotaciones.className = "btn btn-sm btn-outline-warning";
+            btnAnotaciones.type = "button";
+            btnAnotaciones.style.padding = "0.25rem 0.5rem";
+            btnAnotaciones.title = "Editar anotaciones";
+            btnAnotaciones.innerHTML = '<i class="fas fa-sticky-note"></i>';
+            btnAnotaciones.onclick = (e) => {
+                e.preventDefault();
+                editarAnotaciones(item.id, item.anotaciones || '');
+            };
+            
+            // Botón toggle tipo administración
+            const btnTipo = document.createElement("button");
+            const esAdmin = item.tipo === 'administracion' || item.tipo === 'administración';
+            btnTipo.className = esAdmin ? "btn btn-sm btn-warning" : "btn btn-sm btn-outline-secondary";
+            btnTipo.type = "button";
+            btnTipo.style.padding = "0.25rem 0.5rem";
+            btnTipo.title = esAdmin ? "Quitar tipo administración" : "Marcar como administración";
+            btnTipo.innerHTML = '<i class="fas fa-briefcase"></i>';
+            btnTipo.onclick = (e) => {
+                e.preventDefault();
+                toggleTipoAdministracion(item.id, esAdmin);
+            };
+            
+            btnGroup.appendChild(btnAnotaciones);
+            btnGroup.appendChild(btnTipo);
+            actionsDiv.appendChild(btnGroup);
+            
+            wrapper.appendChild(link);
+            wrapper.appendChild(actionsDiv);
+            listElement.appendChild(wrapper);
         });
     }
 
     function fetchConversations() {
+        // Guardar el estado actual de los filtros antes de recargar
+        const unreadFilterActive = filterUnreadCheckbox ? filterUnreadCheckbox.checked : false;
+        const administracionFilterActive = filterAdministracionCheckbox ? filterAdministracionCheckbox.checked : false;
+        const searchTerm = searchInput ? searchInput.value : '';
+        
         fetch(apiUrl)
             .then((response) => {
                 if (!response.ok) {
@@ -284,7 +468,20 @@
             .then((payload) => {
                 if (Array.isArray(payload.conversations)) {
                     allConversations = payload.conversations; // Guardar todas las conversaciones
-                    filterConversations(); // Aplicar filtro si hay búsqueda activa
+                    
+                    // Restaurar el estado de los filtros
+                    if (filterUnreadCheckbox) {
+                        filterUnreadCheckbox.checked = unreadFilterActive;
+                    }
+                    if (filterAdministracionCheckbox) {
+                        filterAdministracionCheckbox.checked = administracionFilterActive;
+                    }
+                    if (searchInput) {
+                        searchInput.value = searchTerm;
+                    }
+                    
+                    // Aplicar filtros con el estado restaurado
+                    filterConversations();
                 }
             })
             .catch((error) => console.error(error));
@@ -317,6 +514,13 @@
         if (filterUnreadCheckbox && filterUnreadCheckbox.checked) {
             filtered = filtered.filter(conversation => {
                 return conversation.unread_count && conversation.unread_count > 0;
+            });
+        }
+        
+        // Filtrar por tipo administración si el checkbox está activado
+        if (filterAdministracionCheckbox && filterAdministracionCheckbox.checked) {
+            filtered = filtered.filter(conversation => {
+                return conversation.tipo === 'administracion';
             });
         }
         
@@ -359,7 +563,18 @@
             filterConversations();
         });
     }
+    
+    // Checkbox para filtrar solo administración
+    if (filterAdministracionCheckbox) {
+        filterAdministracionCheckbox.addEventListener('change', function() {
+            filterConversations();
+        });
+    }
 
+    // Cargar conversaciones inmediatamente al cargar la página
+    // Esto asegura que allConversations esté poblado antes de aplicar filtros
+    fetchConversations();
+    
     setInterval(fetchConversations, 12000); // Reducido de 5s a 12s para mejor rendimiento
     const refreshBtn = document.getElementById("refresh-conversations");
     if (refreshBtn) {
@@ -479,6 +694,78 @@
         });
     }
 })();
+
+// Funciones globales para editar anotaciones y tipo
+function editarAnotaciones(conversationId, anotacionesActuales) {
+    const anotaciones = prompt('Editar anotaciones:', anotacionesActuales || '');
+    if (anotaciones === null) return; // Usuario canceló
+    
+    fetch(`/whatsapp/api/conversaciones/${conversationId}/anotaciones`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            anotaciones: anotaciones.trim()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recargar las conversaciones (fetchConversations ya mantiene el estado de los filtros)
+            const refreshBtn = document.getElementById("refresh-conversations");
+            if (refreshBtn) {
+                refreshBtn.click();
+            }
+        } else {
+            alert('Error: ' + (data.error || 'No se pudieron actualizar las anotaciones'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al actualizar las anotaciones');
+    });
+}
+
+function toggleTipoAdministracion(conversationId, esAdministracion) {
+    const nuevoTipo = esAdministracion ? null : 'administracion';
+    
+    // Guardar estado de filtros antes de recargar
+    const unreadFilterActive = document.getElementById("filter-unread") ? document.getElementById("filter-unread").checked : false;
+    const administracionFilterActive = document.getElementById("filter-administracion") ? document.getElementById("filter-administracion").checked : false;
+    const searchTerm = document.getElementById("conversation-search") ? document.getElementById("conversation-search").value : '';
+    
+    fetch(`/whatsapp/api/conversaciones/${conversationId}/tipo`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            tipo: nuevoTipo
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recargar las conversaciones manteniendo los filtros
+            const refreshBtn = document.getElementById("refresh-conversations");
+            if (refreshBtn) {
+                // Simular click pero mantener estado
+                const event = new Event('click');
+                refreshBtn.dispatchEvent(event);
+            } else {
+                // Si no hay botón, recargar directamente
+                location.reload();
+            }
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo actualizar el tipo de conversación'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al actualizar el tipo de conversación');
+    });
+}
 </script>
 {% endblock %}
 

@@ -177,6 +177,8 @@ class WhatsAppConversation(db.Model):
     contact_name = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    anotaciones = db.Column(db.Text, nullable=True)  # Campo de texto para anotaciones
+    tipo = db.Column(db.String(32), nullable=True, index=True)  # Tipo de conversación (ej: 'administracion')
 
     messages = db.relationship(
         'WhatsAppMessage',
