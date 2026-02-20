@@ -32,3 +32,4 @@ Write-Host "      - SECRET_KEY: Genera una con: python -c `"import secrets; prin
 Write-Host ""
 Write-Host "📖 Para más información, consulta LEERME_ENV.md" -ForegroundColor Cyan
 
+

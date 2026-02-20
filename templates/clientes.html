@@ -84,25 +84,26 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-list"></i> Lista de Clientes</h5>
                     <form method="GET" class="row g-2 align-items-center">
-                        <input type="hidden" name="zona_id" value="{{ zona_seleccionada or '' }}">
-                        <div class="col-sm-2">
-                            <select name="filtro_estado" id="filtro_estado" class="form-select" style="color: #ffffff !important;" onchange="this.form.submit()">
-                                <option value="activos" {% if filtro_estado == 'activos' %}selected{% endif %}>Solo activos</option>
-                                <option value="todos" {% if filtro_estado == 'todos' %}selected{% endif %}>Todos</option>
-                                <option value="inactivos" {% if filtro_estado == 'inactivos' %}selected{% endif %}>Solo inactivos</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-3">
-                            <input type="text" class="form-control" name="codigo" placeholder="Código" value="{{ filtro_codigo or '' }}">
-                        </div>
-                        <div class="col-sm-4">
-                            <input type="text" class="form-control" name="nombre" placeholder="Nombre" value="{{ filtro_nombre or '' }}">
-                        </div>
-                        <div class="col-sm-3 d-flex gap-2">
-                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i></button>
-                            <a href="{{ url_for('clientes') }}" class="btn btn-outline-secondary w-100"><i class="fas fa-undo"></i></a>
-                        </div>
-                    </form>
+                            <input type="hidden" name="zona_id" value="{{ zona_seleccionada or '' }}">
+                            <div class="col-sm-2">
+                                <select name="filtro_estado" id="filtro_estado" class="form-select" style="color: #ffffff !important;" onchange="this.form.submit()">
+                                    <option value="activos" {% if filtro_estado == 'activos' %}selected{% endif %}>Solo activos</option>
+                                    <option value="todos" {% if filtro_estado == 'todos' %}selected{% endif %}>Todos</option>
+                                    <option value="inactivos" {% if filtro_estado == 'inactivos' %}selected{% endif %}>Solo inactivos</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-3">
+                                <input type="text" class="form-control" name="codigo" placeholder="Código" value="{{ filtro_codigo or '' }}">
+                            </div>
+                            <div class="col-sm-4">
+                                <input type="text" class="form-control" name="nombre" placeholder="Nombre" value="{{ filtro_nombre or '' }}">
+                            </div>
+                            <div class="col-sm-3 d-flex gap-2">
+                                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i></button>
+                                <a href="{{ url_for('clientes') }}" class="btn btn-outline-secondary w-100"><i class="fas fa-undo"></i></a>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
@@ -127,13 +128,15 @@
                                     <td style="color: #ffffff !important;">{{ cliente.codigo or '—' }}</td>
                                     <td style="color: #ffffff !important;">{{ cliente.nombre }}</td>
                                     <td style="color: #ffffff !important;">
-                                        <form method="POST" action="{{ url_for('toggle_cliente', cliente_id=cliente.id) }}" class="d-inline">
-                                            <input type="hidden" name="field" value="activo">
-                                            <input type="hidden" name="next" value="{{ request.full_path }}">
-                                            <button type="submit" class="btn btn-sm {% if cliente.activo %}btn-success{% else %}btn-outline-secondary{% endif %}">
-                                                {% if cliente.activo %}Activo{% else %}Inactivo{% endif %}
-                                            </button>
-                                        </form>
+                                        {% if cliente.activo %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle"></i> Activo
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-times-circle"></i> Inactivo
+                                        </span>
+                                        {% endif %}
                                     </td>
                                     <td style="color: #ffffff !important;">
                                         <a href="https://wa.me/{{ cliente.telefono }}" target="_blank" class="btn btn-sm btn-whatsapp">
@@ -151,11 +154,20 @@
                                                 <i class="fab fa-whatsapp"></i>
                                             </a>
                                             <a href="{{ url_for('editar_cliente', cliente_id=cliente.id) }}" 
-                                               class="btn btn-warning btn-sm">
+                                               class="btn btn-warning btn-sm" title="Editar cliente">
                                                 <i class="fas fa-edit"></i> Editar
                                             </a>
+                                            {% if not cliente.activo %}
+                                            <form method="POST" action="{{ url_for('toggle_cliente', cliente_id=cliente.id) }}" class="d-inline" title="Activar cliente">
+                                                <input type="hidden" name="field" value="activo">
+                                                <input type="hidden" name="next" value="{{ request.full_path }}">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-check"></i> Activar
+                                                </button>
+                                            </form>
+                                            {% endif %}
                                             <button type="button" class="btn btn-danger btn-sm" 
-                                                    onclick="confirmarEliminacion({{ cliente.id }}, '{{ cliente.nombre }}')">
+                                                    onclick="confirmarEliminacion({{ cliente.id }}, '{{ cliente.nombre }}')" title="Desactivar cliente">
                                                 <i class="fas fa-trash"></i> Eliminar
                                             </button>
                                         </div>
@@ -177,14 +189,14 @@
 </div>
 
 <!-- Modal de confirmación para eliminar -->
-<div class="modal fade" id="confirmModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true" data-bs-backdrop="false" data-bs-keyboard="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: #1a1a1a; color: white;">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">
+                <h5 class="modal-title" id="confirmModalLabel">
                     <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>¿Estás seguro de que quieres desactivar el cliente <strong id="clienteNombre"></strong>?</p>
@@ -207,14 +219,70 @@
     </div>
 </div>
 
+<style>
+/* Asegurar que el modal tenga z-index correcto */
+.modal {
+    z-index: 1055 !important;
+}
+.modal-content {
+    z-index: 1056 !important;
+}
+/* Ocultar completamente cualquier backdrop que pueda aparecer */
+.modal-backdrop {
+    display: none !important;
+}
+</style>
+
 <script>
 function confirmarEliminacion(clienteId, clienteNombre) {
+    // Limpiar cualquier backdrop anterior que pueda estar atascado
+    var existingBackdrops = document.querySelectorAll('.modal-backdrop');
+    existingBackdrops.forEach(function(backdrop) {
+        backdrop.remove();
+    });
+    
+    // Remover clase modal-open del body si existe
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+    
+    // Configurar el modal
     document.getElementById('clienteNombre').textContent = clienteNombre;
     document.getElementById('deleteForm').action = '/clientes/eliminar/' + clienteId;
     
-    var modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    var modalElement = document.getElementById('confirmModal');
+    var modal = new bootstrap.Modal(modalElement, {
+        backdrop: false,
+        keyboard: true
+    });
+    
+    // Event listeners para limpiar cuando se cierre
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        // Limpiar backdrop si queda
+        var backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(function(backdrop) {
+            backdrop.remove();
+        });
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    });
+    
+    // Mostrar el modal
     modal.show();
 }
 
+// Limpiar backdrop al cargar la página si hay alguno atascado
+document.addEventListener('DOMContentLoaded', function() {
+    var stuckBackdrops = document.querySelectorAll('.modal-backdrop');
+    if (stuckBackdrops.length > 0) {
+        stuckBackdrops.forEach(function(backdrop) {
+            backdrop.remove();
+        });
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+});
 </script>
 {% endblock %}

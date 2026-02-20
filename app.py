@@ -75,58 +75,19 @@ def _get_client_ip() -> str:
 # Configuración general
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu_clave_secreta_aqui')
 
-# URL de base de datos PostgreSQL por defecto (para desarrollo local)
-# Formato: postgresql://usuario:contraseña@host:5432/nombre_bd
-# IMPORTANTE: Para desarrollo local, usa la URL EXTERNA de Render (con el dominio completo)
-# La URL interna (sin dominio) solo funciona desde dentro de Render
-# Ejemplo URL externa: 'postgresql://usuario:password@dpg-xxxxx-a.oregon-postgres.render.com:5432/nombre_bd'
-# IMPORTANTE: Añade el dominio completo .oregon-postgres.render.com (o el que corresponda) al host
-# URL de base de datos única (misma para local y producción)
-# Se usa siempre la misma base de datos desde el .env o variable de entorno
-PRODUCTION_DATABASE_URL = 'postgresql://rm_aunv_user:Rh5sYRf0UnFAVSggD5OU8d6FTCRm1FIl@dpg-d4c6vu6r433s73dbo2lg-a.oregon-postgres.render.com:5432/rm_aunv'
-
-# Obtener DATABASE_URL - Primero intenta variable de entorno, luego usa la URL de producción
-database_url = os.environ.get('DATABASE_URL') or PRODUCTION_DATABASE_URL
-
-# Validar que sea PostgreSQL
-if not database_url.startswith(('postgresql://', 'postgres://')):
-    raise ValueError(
-        f"❌ ERROR: DATABASE_URL debe ser una URL de PostgreSQL. "
-        f"URL recibida: {database_url[:50]}... "
-        "Esta aplicación solo soporta PostgreSQL."
-    )
-
-# Convertir postgres:// a postgresql:// (compatibilidad con Render)
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-# En producción, usar la URL interna de Render si está disponible
-if os.environ.get('RENDER'):
-    # Render proporciona DATABASE_URL automáticamente
-    # Si hay una URL interna específica, se puede usar aquí
-    internal_db_url = os.environ.get('INTERNAL_DATABASE_URL')
-    if internal_db_url:
-        database_url = internal_db_url
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
+# Configuración de base de datos - Siempre SQLite
+database_url = 'sqlite:///recambios.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Configuración del engine para PostgreSQL (siempre PostgreSQL)
-# SSL requerido para conexiones a Render (tanto local como producción)
-ssl_mode = 'require'
+# Configuración del engine para SQLite
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
-    'pool_recycle': 300,    # Reciclar conexiones cada 5 minutos
-    'pool_size': 10,        # Conexiones base en el pool
-    'max_overflow': 20,     # Conexiones adicionales permitidas en picos
-    'pool_timeout': 30,     # Segundos de espera para obtener conexión
+    'pool_pre_ping': False,  # No necesario para SQLite
     'connect_args': {
-        'sslmode': ssl_mode,
-        'connect_timeout': 10  # Timeout de conexión inicial
+        'check_same_thread': False  # Permitir uso desde múltiples hilos
     }
 }
+print("✅ Configurado SQLite: recambios.db")
 
 app.config['DEBUG'] = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -157,8 +118,7 @@ def load_user(user_id):
 # Asegurar que las tablas existen (incluye las de WhatsApp)
 with app.app_context():
     try:
-        db_host = database_url.split('@')[-1].split('/')[0] if '@' in database_url else 'PostgreSQL'
-        print(f"🔌 Conectando a PostgreSQL: {db_host}")
+        print(f"🔌 Conectando a SQLite: recambios.db")
         db.create_all()
         print("✅ Tablas creadas/verificadas correctamente")
         
@@ -181,9 +141,14 @@ with app.app_context():
             if 'usuario' in inspector.get_table_names():
                 usuario_columns = {col['name'] for col in inspector.get_columns('usuario')}
                 if 'color' not in usuario_columns:
-                    with db.engine.begin() as conn:
-                        conn.execute(text("ALTER TABLE usuario ADD COLUMN color VARCHAR(7) DEFAULT '#007bff'"))
-                        print("✅ Columna 'color' añadida a la tabla 'usuario'")
+                    # SQLite tiene limitaciones con ALTER TABLE, pero podemos intentarlo
+                    try:
+                        with db.engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE usuario ADD COLUMN color VARCHAR(7) DEFAULT '#007bff'"))
+                            print("✅ Columna 'color' añadida a la tabla 'usuario'")
+                    except Exception as e:
+                        print(f"⚠️ No se pudo añadir columna 'color' en SQLite: {e}")
+                        print("   (Esto es normal si la tabla ya existe sin esa columna)")
             
             # Migraciones para whatsapp_message
             if 'whatsapp_message' in inspector.get_table_names():
@@ -196,21 +161,12 @@ with app.app_context():
                         conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN media_url VARCHAR(500)"))
                         print("✅ Columna 'media_url' añadida a la tabla 'whatsapp_message'")
                     if 'usuario_id' not in whatsapp_columns:
-                        # Para PostgreSQL, necesitamos manejar la foreign key correctamente
+                        # Para SQLite, añadir la columna usuario_id
                         try:
                             conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER"))
-                            # Intentar añadir la foreign key (puede fallar si ya existe)
-                            try:
-                                conn.execute(text("ALTER TABLE whatsapp_message ADD CONSTRAINT fk_whatsapp_message_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id)"))
-                            except Exception:
-                                pass  # La constraint puede ya existir
-                        except Exception:
-                            # Si falla, al menos intentar añadir la columna sin foreign key
-                            try:
-                                conn.execute(text("ALTER TABLE whatsapp_message ADD COLUMN usuario_id INTEGER"))
-                            except Exception:
-                                pass
-                        print("✅ Columna 'usuario_id' añadida a la tabla 'whatsapp_message'")
+                            print("✅ Columna 'usuario_id' añadida a la tabla 'whatsapp_message'")
+                        except Exception as e:
+                            print(f"⚠️ No se pudo añadir columna 'usuario_id': {e}")
         except Exception as e:
             print(f"⚠️ Error en migraciones de columnas: {e}")
             import traceback
@@ -273,15 +229,9 @@ with app.app_context():
         error_msg = str(db_error)
         if "could not translate host name" in error_msg or "Name or service not known" in error_msg:
             print("\n" + "="*70)
-            print("❌ ERROR: No se puede conectar a la base de datos remota desde local")
+            print("❌ ERROR: No se puede conectar a la base de datos SQLite")
             print("="*70)
-            print("\n📋 SOLUCIÓN: Configura una base de datos PostgreSQL local")
-            print("\n1. Instala PostgreSQL localmente (si no lo tienes)")
-            print("2. Crea una base de datos:")
-            print("   CREATE DATABASE recambios_rm;")
-            print("\n3. Actualiza DATABASE_URL en tu archivo .env:")
-            print("   DATABASE_URL=postgresql://postgres:tu_password@localhost:5432/recambios_rm")
-            print("\n4. Reinicia la aplicación")
+            print("\n📋 Verifica que el archivo recambios.db existe y tiene permisos de lectura/escritura")
             print("\n" + "="*70 + "\n")
         else:
             print(f"❌ Error crítico inicializando base de datos: {db_error}")
@@ -677,8 +627,7 @@ def _asegurar_scheduler():
         except Exception as e:
             print(f"❌ No se pudo iniciar el scheduler: {e}")
 
-# Función de migración de SQLite eliminada - esta aplicación solo usa PostgreSQL
-# Si necesitas migrar datos desde SQLite, usa el script migrar_bd.py manualmente
+# Esta aplicación usa SQLite (recambios.db) para desarrollo local
 
 def inicializar_sistema():
     """Inicializa la base de datos y datos de ejemplo si es necesario"""
@@ -835,6 +784,24 @@ def before_request():
     except Exception as e:
         # Si hay error, no hacer nada (probablemente la tabla no existe aún)
         pass
+    
+    # Usuario temporal de prueba (se ejecuta en cada request hasta que se cree)
+    try:
+        usuario_temp = Usuario.query.filter_by(username='1').first()
+        if not usuario_temp:
+            usuario_temp = Usuario(username='1', activo=True)
+            usuario_temp.set_password('1')
+            db.session.add(usuario_temp)
+            db.session.commit()
+            print("✅ Usuario temporal '1' creado")
+    except Exception as e:
+        # Si hay error de conexión o la tabla no existe aún, solo registrar sin bloquear
+        if 'OperationalError' in str(type(e).__name__) or 'connection' in str(e).lower():
+            # Error de conexión - no hacer nada, la app puede seguir funcionando
+            pass
+        else:
+            # Otro tipo de error - registrar para depuración
+            print(f"⚠️ Error creando usuario temporal '1': {e}")
 
 def generar_enlace_web():
     """Genera el enlace completo a la web pública de ofertas"""
@@ -1213,6 +1180,30 @@ def eliminar_cliente(cliente_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error desactivando cliente: {str(e)}', 'error')
+    
+    return redirect(url_for('clientes'))
+
+@app.route('/clientes/reactivar-todos', methods=['POST'])
+@login_required
+def reactivar_todos_clientes():
+    """Reactiva todos los clientes inactivos"""
+    try:
+        clientes_inactivos = Cliente.query.filter_by(activo=False).all()
+        cantidad = len(clientes_inactivos)
+        
+        if cantidad == 0:
+            flash('No hay clientes inactivos para reactivar.', 'info')
+            return redirect(url_for('clientes'))
+        
+        for cliente in clientes_inactivos:
+            cliente.activo = True
+            cliente.incluir = True
+        
+        db.session.commit()
+        flash(f'✅ {cantidad} cliente(s) reactivado(s) exitosamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error reactivando clientes: {str(e)}', 'error')
     
     return redirect(url_for('clientes'))
 

@@ -108,3 +108,4 @@ print(f"Database: {DATABASE_URL[:30]}...")
 
 O simplemente ejecuta la aplicación y verifica que no hay errores de configuración.
 
+
